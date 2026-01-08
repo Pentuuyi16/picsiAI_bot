@@ -1,0 +1,280 @@
+import sqlite3
+from config import DATABASE_PATH
+
+
+class Database:
+    """Класс для работы с базой данных SQLite"""
+    
+    def __init__(self, db_path: str = DATABASE_PATH):
+        """Инициализация подключения к базе данных"""
+        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=10.0)
+        self.cursor = self.conn.cursor()
+        self.create_tables()
+        self.create_generations_table()
+        self.update_users_table_for_referrals()
+        self.create_referral_earnings_table()
+    
+    def create_tables(self):
+        """Создаёт необходимые таблицы, если они не существуют"""
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                agreed_to_terms INTEGER DEFAULT 0,
+                balance REAL DEFAULT 0.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                referrer_id INTEGER,
+                referral_balance REAL DEFAULT 0.0,
+                referral_code TEXT UNIQUE
+            )
+        ''')
+    
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pending_actions (
+                user_id INTEGER PRIMARY KEY,
+                action_type TEXT,
+                action_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+    
+        self.conn.commit()
+        
+        
+    
+    def create_generations_table(self):
+        """Создаёт таблицу для хранения генераций"""
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS generations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                file_url TEXT NOT NULL,
+                prompt TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (user_id)
+            )
+        ''')
+        self.conn.commit()
+    
+    def update_users_table_for_referrals(self):
+        """Добавляет поля для реферальной системы в таблицу users (для старых БД)"""
+        # Проверяем есть ли уже колонка referral_code
+        self.cursor.execute("PRAGMA table_info(users)")
+        columns = [column[1] for column in self.cursor.fetchall()]
+    
+        if 'referral_code' not in columns:
+            try:
+                self.cursor.execute('ALTER TABLE users ADD COLUMN referrer_id INTEGER')
+                self.cursor.execute('ALTER TABLE users ADD COLUMN referral_balance REAL DEFAULT 0.0')
+                self.cursor.execute('ALTER TABLE users ADD COLUMN referral_code TEXT UNIQUE')
+                self.conn.commit()
+                print("✅ Добавлены поля для реферальной системы")
+            except Exception as e:
+                print(f"⚠️ Ошибка добавления полей: {e}")
+    
+    def create_referral_earnings_table(self):
+        """Создаёт таблицу для истории реферальных начислений"""
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS referral_earnings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                from_user_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                payment_amount REAL NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (user_id),
+                FOREIGN KEY (from_user_id) REFERENCES users (user_id)
+            )
+        ''')
+        self.conn.commit()
+    
+    def generate_referral_code(self, user_id: int):
+        """Генерирует уникальный реферальный код для пользователя"""
+        import random
+        import string
+        
+        while True:
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            self.cursor.execute('SELECT user_id FROM users WHERE referral_code = ?', (code,))
+            if not self.cursor.fetchone():
+                self.cursor.execute('UPDATE users SET referral_code = ? WHERE user_id = ?', (code, user_id))
+                self.conn.commit()
+                return code
+    
+    def get_referral_code(self, user_id: int):
+        """Получает реферальный код пользователя"""
+        self.cursor.execute('SELECT referral_code FROM users WHERE user_id = ?', (user_id,))
+        result = self.cursor.fetchone()
+        return result[0] if result and result[0] else None
+    
+    def set_referrer(self, user_id: int, referrer_id: int):
+        """Устанавливает реферера для пользователя"""
+        self.cursor.execute('UPDATE users SET referrer_id = ? WHERE user_id = ?', (referrer_id, user_id))
+        self.conn.commit()
+    
+    def get_user_by_referral_code(self, referral_code: str):
+        """Получает пользователя по реферальному коду"""
+        self.cursor.execute('SELECT user_id FROM users WHERE referral_code = ?', (referral_code,))
+        result = self.cursor.fetchone()
+        return result[0] if result else None
+    
+    def add_referral_earning(self, user_id: int, from_user_id: int, amount: float, payment_amount: float):
+        """Добавляет реферальное начисление"""
+        self.cursor.execute('''
+            INSERT INTO referral_earnings (user_id, from_user_id, amount, payment_amount)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, from_user_id, amount, payment_amount))
+    
+        self.conn.commit()
+        
+        # Обновляем реферальный баланс
+        self.cursor.execute('''
+            UPDATE users SET referral_balance = referral_balance + ? WHERE user_id = ?
+        ''', (amount, user_id))
+        
+        self.conn.commit()
+    
+    def get_referral_stats(self, user_id: int):
+        """Получает статистику по рефералам"""
+        # Количество приглашённых
+        self.cursor.execute('SELECT COUNT(*) FROM users WHERE referrer_id = ?', (user_id,))
+        referrals_count = self.cursor.fetchone()[0]
+        
+        # Всего заработано
+        self.cursor.execute('SELECT SUM(amount) FROM referral_earnings WHERE user_id = ?', (user_id,))
+        total_earned = self.cursor.fetchone()[0] or 0.0
+        
+        return {
+            'referrals_count': referrals_count,
+            'total_earned': total_earned
+        }
+    
+    def save_generation(self, user_id: int, gen_type: str, file_url: str, prompt: str = None):
+        """Сохраняет генерацию пользователя"""
+        self.cursor.execute('''
+            INSERT INTO generations (user_id, type, file_url, prompt)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, gen_type, file_url, prompt))
+        self.conn.commit()
+        print(f"💾 Сохранена генерация: user={user_id}, type={gen_type}")
+    
+    def get_user_photos(self, user_id: int):
+        """Получает все оживлённые фото пользователя"""
+        self.cursor.execute('''
+            SELECT file_url, prompt, created_at FROM generations
+            WHERE user_id = ? AND type = 'photo_animation'
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        return self.cursor.fetchall()
+    
+    def get_user_videos(self, user_id: int):
+        """Получает все сгенерированные видео пользователя"""
+        self.cursor.execute('''
+            SELECT file_url, prompt, created_at FROM generations
+            WHERE user_id = ? AND type = 'video_generation'
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        return self.cursor.fetchall()
+    
+    def get_user_edited_images(self, user_id: int):
+        """Получает все отредактированные изображения пользователя"""
+        self.cursor.execute('''
+            SELECT file_url, prompt, created_at FROM generations
+            WHERE user_id = ? AND type = 'image_editing'
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        return self.cursor.fetchall()
+    
+    def add_user(self, user_id: int, username: str = None, first_name: str = None, 
+                 last_name: str = None):
+        """Добавляет нового пользователя в базу данных"""
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, balance)
+            VALUES (?, ?, ?, ?, 0.0)
+        ''', (user_id, username, first_name, last_name))
+        self.conn.commit()
+    
+    def get_user(self, user_id: int):
+        """Получает информацию о пользователе"""
+        self.cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+        row = self.cursor.fetchone()
+        if row:
+            # Обновляем для поддержки новых полей
+            return {
+                'user_id': row[0],
+                'username': row[1],
+                'first_name': row[2],
+                'last_name': row[3],
+                'agreed_to_terms': row[4],
+                'balance': row[5],
+                'created_at': row[6],
+                'referrer_id': row[7] if len(row) > 7 else None,
+                'referral_balance': row[8] if len(row) > 8 else 0.0,
+                'referral_code': row[9] if len(row) > 9 else None
+            }
+        return None
+    
+    def update_user_agreement(self, user_id: int):
+        """Обновляет статус согласия пользователя с условиями"""
+        self.cursor.execute('''
+            UPDATE users SET agreed_to_terms = 1 WHERE user_id = ?
+        ''', (user_id,))
+        self.conn.commit()
+    
+    def user_agreed_to_terms(self, user_id: int) -> bool:
+        """Проверяет, согласился ли пользователь с условиями"""
+        self.cursor.execute('SELECT agreed_to_terms FROM users WHERE user_id = ?', (user_id,))
+        result = self.cursor.fetchone()
+        return result[0] == 1 if result else False
+    
+    def add_to_balance(self, user_id: int, amount: float):
+        """Добавляет средства к балансу пользователя"""
+        user = self.get_user(user_id)
+        if user:
+            new_balance = user['balance'] + amount
+            print(f"💰 Пополнение баланса: User {user_id}, Old: {user['balance']}, Add: {amount}, New: {new_balance}")
+            self.update_user_balance(user_id, new_balance)
+            # Проверяем что баланс действительно обновился
+            updated_user = self.get_user(user_id)
+            print(f"✅ Баланс после обновления: {updated_user['balance']}")
+    
+    def update_user_balance(self, user_id: int, new_balance: float):
+        """Обновляет баланс пользователя"""
+        print(f"📝 Обновление баланса в БД: User {user_id}, New Balance: {new_balance}")
+        self.cursor.execute('''
+            UPDATE users SET balance = ? WHERE user_id = ?
+        ''', (new_balance, user_id))
+        self.conn.commit()
+
+    
+    def save_pending_action(self, user_id: int, action_type: str, action_data: str):
+        """Сохраняет незавершённое действие пользователя"""
+        self.cursor.execute('''
+            INSERT OR REPLACE INTO pending_actions (user_id, action_type, action_data)
+            VALUES (?, ?, ?)
+        ''', (user_id, action_type, action_data))
+        self.conn.commit()
+    
+    def get_pending_action(self, user_id: int):
+        """Получает незавершённое действие пользователя"""
+        self.cursor.execute('SELECT action_type, action_data FROM pending_actions WHERE user_id = ?', (user_id,))
+        result = self.cursor.fetchone()
+        if result:
+            pending = {'action_type': result[0], 'action_data': result[1]}
+            print(f"📥 Получен pending action для user {user_id}: {pending['action_type']}")
+            return pending
+        print(f"⚠️ Pending action не найден для user {user_id}")
+        return None
+    
+    def clear_pending_action(self, user_id: int):
+        """Удаляет незавершённое действие после выполнения"""
+        self.cursor.execute('DELETE FROM pending_actions WHERE user_id = ?', (user_id,))
+        self.conn.commit()
+    
+    def __del__(self):
+        """Закрывает соединение при удалении объекта"""
+        if hasattr(self, 'conn'):
+            self.conn.close()
