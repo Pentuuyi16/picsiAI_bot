@@ -13,6 +13,7 @@ class Database:
         self.create_generations_table()
         self.update_users_table_for_referrals()
         self.create_referral_earnings_table()
+        self.create_payments_table()
     
     def create_tables(self):
         """Создаёт необходимые таблицы, если они не существуют"""
@@ -41,7 +42,57 @@ class Database:
         ''')
     
         self.conn.commit()
-        
+    
+    def create_payments_table(self):
+        """Создаёт таблицу для хранения платежей"""
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                payment_id TEXT UNIQUE NOT NULL,
+                user_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                paid_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (user_id)
+            )
+        ''')
+        self.conn.commit()
+    
+    def save_payment(self, payment_id: str, user_id: int, amount: float):
+        """Сохраняет платёж в БД"""
+        self.cursor.execute('''
+            INSERT INTO payments (payment_id, user_id, amount, status)
+            VALUES (?, ?, ?, 'pending')
+        ''', (payment_id, user_id, amount))
+        self.conn.commit()
+        print(f"💾 Платёж сохранён: payment_id={payment_id}, user_id={user_id}, amount={amount}")
+    
+    def get_payment(self, payment_id: str):
+        """Получает платёж по ID"""
+        self.cursor.execute('SELECT * FROM payments WHERE payment_id = ?', (payment_id,))
+        row = self.cursor.fetchone()
+        if row:
+            return {
+                'id': row[0],
+                'payment_id': row[1],
+                'user_id': row[2],
+                'amount': row[3],
+                'status': row[4],
+                'created_at': row[5],
+                'paid_at': row[6]
+            }
+        return None
+    
+    def update_payment_status(self, payment_id: str, status: str):
+        """Обновляет статус платежа"""
+        self.cursor.execute('''
+            UPDATE payments 
+            SET status = ?, paid_at = CURRENT_TIMESTAMP 
+            WHERE payment_id = ?
+        ''', (status, payment_id))
+        self.conn.commit()
+        print(f"✅ Статус платежа обновлён: payment_id={payment_id}, status={status}")
         
     
     def create_generations_table(self):
@@ -61,7 +112,6 @@ class Database:
     
     def update_users_table_for_referrals(self):
         """Добавляет поля для реферальной системы в таблицу users (для старых БД)"""
-        # Проверяем есть ли уже колонка referral_code
         self.cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in self.cursor.fetchall()]
     
@@ -130,7 +180,6 @@ class Database:
     
         self.conn.commit()
         
-        # Обновляем реферальный баланс
         self.cursor.execute('''
             UPDATE users SET referral_balance = referral_balance + ? WHERE user_id = ?
         ''', (amount, user_id))
@@ -139,11 +188,9 @@ class Database:
     
     def get_referral_stats(self, user_id: int):
         """Получает статистику по рефералам"""
-        # Количество приглашённых
         self.cursor.execute('SELECT COUNT(*) FROM users WHERE referrer_id = ?', (user_id,))
         referrals_count = self.cursor.fetchone()[0]
         
-        # Всего заработано
         self.cursor.execute('SELECT SUM(amount) FROM referral_earnings WHERE user_id = ?', (user_id,))
         total_earned = self.cursor.fetchone()[0] or 0.0
         
@@ -202,7 +249,6 @@ class Database:
         self.cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
         row = self.cursor.fetchone()
         if row:
-            # Обновляем для поддержки новых полей
             return {
                 'user_id': row[0],
                 'username': row[1],
@@ -237,7 +283,6 @@ class Database:
             new_balance = user['balance'] + amount
             print(f"💰 Пополнение баланса: User {user_id}, Old: {user['balance']}, Add: {amount}, New: {new_balance}")
             self.update_user_balance(user_id, new_balance)
-            # Проверяем что баланс действительно обновился
             updated_user = self.get_user(user_id)
             print(f"✅ Баланс после обновления: {updated_user['balance']}")
     

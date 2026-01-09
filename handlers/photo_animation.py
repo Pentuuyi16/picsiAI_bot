@@ -11,7 +11,7 @@ router = Router()
 api_client = KieApiClient()
 
 # File ID вашего видео-примера
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAMWaWAW_Z548Y68GNeAMoDVVZSDf8AAAtifAALy1QABSxBlZ46cE79WOAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAPvaWGA69xQOEWEnrLjY0WPBYm_cwMAAiGZAALy1QhLo4jVE-ApxxU4BA"
 
 
 class PhotoAnimationStates(StatesGroup):

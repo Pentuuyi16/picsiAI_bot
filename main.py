@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
 from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support
+from webhook_server import start_webhook_server
 
 # Настройка логирования
 logging.basicConfig(
@@ -42,12 +43,17 @@ async def main():
         await message.answer(f"Video File ID:\n`{file_id}`", parse_mode="Markdown")
         print(f"📹 Video File ID: {file_id}")
     
-    logger.info("Бот запущен")
+    logger.info("🚀 Бот запущен")
+    
+    # Запускаем webhook сервер
+    webhook_runner = await start_webhook_server(bot, host='127.0.0.1', port=8080)
+    logger.info("✅ Webhook сервер запущен на 127.0.0.1:8080")
     
     # Запускаем polling
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        await webhook_runner.cleanup()
         await bot.session.close()
 
 
@@ -55,4 +61,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Бот остановлен")
+        logger.info("⛔ Бот остановлен")

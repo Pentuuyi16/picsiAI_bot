@@ -86,6 +86,7 @@ def get_balance_amounts_keyboard(back_to: str = "photo_animation") -> InlineKeyb
     """Создаёт клавиатуру с суммами для пополнения"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text="1₽", callback_data="amount_1")],
             [
                 InlineKeyboardButton(text="80₽", callback_data="amount_80"),
                 InlineKeyboardButton(text="160₽", callback_data="amount_160"),
