@@ -2,6 +2,7 @@ from aiohttp import web
 import logging
 from database.database import Database
 from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
@@ -82,11 +83,20 @@ async def yookassa_webhook(request):
             # Отправляем уведомление пользователю
             try:
                 bot = request.app['bot']
+                user_balance = db.get_user(user_id)['balance']
+                
+                keyboard = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                    ]
+                )
+                
                 await bot.send_message(
                     user_id,
-                    f"✅ Платёж успешно получен!\n\n"
-                    f"💰 Начислено: {amount:.2f} ₽\n"
-                    f"💳 Ваш новый баланс: {db.get_user(user_id)['balance']:.2f} ₽"
+                    f"💫 Оплата прошла успешно\n\n"
+                    f"<blockquote>Мой текущий баланс: {user_balance:.2f} ₽</blockquote>",
+                    parse_mode="HTML",
+                    reply_markup=keyboard
                 )
                 logger.info(f"✅ Уведомление отправлено пользователю {user_id}")
             except Exception as e:

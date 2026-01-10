@@ -181,7 +181,7 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
         "3️⃣ <b><i>Подождите всего пару минут</i></b> — и получите изображение с качественным редактированием.\n\n"
         "Ваши <b><i>фото</i></b> могут выглядеть ещё лучше 💫\n\n"
         f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"🎨 Редактирование 1 фото = 25₽</blockquote>"
+        f"🎨 Редактирование 1 изображения = 35₽</blockquote>"
     )
     
     # Удаляем старое сообщение
@@ -232,8 +232,9 @@ async def amount_1_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"💰 Счёт на {amount}₽ создан\n\n"
-            f"Нажмите кнопку ниже для оплаты:",
+            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
+            parse_mode="HTML",
             reply_markup=keyboard
         )
     else:
@@ -275,8 +276,9 @@ async def amount_80_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"💰 Счёт на {amount}₽ создан\n\n"
-            f"Нажмите кнопку ниже для оплаты:",
+            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
+            parse_mode="HTML",
             reply_markup=keyboard
         )
     else:
@@ -318,8 +320,9 @@ async def amount_160_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"💰 Счёт на {amount}₽ создан\n\n"
-            f"Нажмите кнопку ниже для оплаты:",
+            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
+            parse_mode="HTML",
             reply_markup=keyboard
         )
     else:
@@ -361,8 +364,9 @@ async def amount_320_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"💰 Счёт на {amount}₽ создан\n\n"
-            f"Нажмите кнопку ниже для оплаты:",
+            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
+            parse_mode="HTML",
             reply_markup=keyboard
         )
     else:
@@ -404,8 +408,9 @@ async def amount_640_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"💰 Счёт на {amount}₽ создан\n\n"
-            f"Нажмите кнопку ниже для оплаты:",
+            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
+            parse_mode="HTML",
             reply_markup=keyboard
         )
     else:
@@ -418,45 +423,37 @@ async def amount_640_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("start_action_"))
 async def start_action_handler(callback: CallbackQuery):
-    """Обработчик подтверждения начала действия после пополнения"""
+    """Обработчик подтверждения начала действия после оплаты"""
     from database.database import Database
+    from utils.texts import TEXTS
     from aiogram.types import URLInputFile
     from utils.api_client import KieApiClient
     from utils.veo_api_client import VeoApiClient
     from utils.image_edit_client import ImageEditClient
-    from utils.texts import TEXTS
     import json
     import logging
     
     logger = logging.getLogger(__name__)
     
+    user_id = callback.from_user.id
     action_type = callback.data.replace("start_action_", "")
     
-    user_id = callback.from_user.id
     db = Database()
     
-    # Получаем pending action
+    # Получаем незавершённое действие
     pending = db.get_pending_action(user_id)
     
     if not pending:
-        await callback.message.answer("❌ Не найдено незавершённое действие")
+        await callback.message.answer("❌ Действие не найдено")
         return
-    
-    # Удаляем pending action
-    db.clear_pending_action(user_id)
     
     # Получаем баланс
     user = db.get_user(user_id)
     balance = user['balance'] if user else 0.00
     
-    # Парсим данные
-    try:
-        action_data = json.loads(pending['action_data'])
-    except:
-        await callback.message.answer("❌ Ошибка при обработке данных")
-        return
+    # Парсим данные действия
+    action_data = json.loads(pending['action_data'])
     
-    # Обрабатываем действие
     if action_type == "photo_animation_pending":
         # Оживление фото
         photo_url = action_data.get("photo_url")
@@ -469,7 +466,7 @@ async def start_action_handler(callback: CallbackQuery):
             return
         
         processing_msg = await callback.message.answer(
-            "⭐ Начинается генерация, совсем скоро пришлем готовое видео"
+            "⭐ Начинается оживление фотографии, совсем скоро пришлем результат"
         )
         
         try:
