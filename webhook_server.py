@@ -3,6 +3,7 @@ import logging
 from database.database import Database
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -85,19 +86,82 @@ async def yookassa_webhook(request):
                 bot = request.app['bot']
                 user_balance = db.get_user(user_id)['balance']
                 
-                keyboard = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
-                    ]
-                )
+                # Проверяем есть ли pending action
+                pending = db.get_pending_action(user_id)
                 
-                await bot.send_message(
-                    user_id,
-                    f"💫 Оплата прошла успешно\n\n"
-                    f"<blockquote>Мой текущий баланс: {user_balance:.2f} ₽</blockquote>",
-                    parse_mode="HTML",
-                    reply_markup=keyboard
-                )
+                if pending:
+                    action_type = pending['action_type']
+                    action_data = json.loads(pending['action_data'])
+                    
+                    # Определяем требуемую сумму
+                    required_amount = 0
+                    action_emoji = ""
+                    action_text = ""
+                    
+                    if action_type == "photo_animation_pending":
+                        required_amount = 40.00
+                        action_emoji = "📸"
+                        action_text = "оживление фото"
+                    elif action_type == "video_generation_pending":
+                        state_data = action_data.get("state_data", {})
+                        veo_model = state_data.get("veo_model", "veo3_fast")
+                        required_amount = 65.00 if veo_model == "veo3_fast" else 115.00
+                        action_emoji = "📹"
+                        action_text = "генерацию видео"
+                    elif action_type == "image_editing_pending":
+                        required_amount = 35.00
+                        action_emoji = "🎨"
+                        action_text = "редактирование изображения"
+                    
+                    # Проверяем хватает ли баланса
+                    if user_balance >= required_amount:
+                        # Баланса достаточно - предлагаем начать
+                        keyboard = InlineKeyboardMarkup(
+                            inline_keyboard=[
+                                [InlineKeyboardButton(text="Да", callback_data=f"start_action_{action_type}")],
+                                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                            ]
+                        )
+                        
+                        await bot.send_message(
+                            user_id,
+                            f"{action_emoji} Мы готовы начинать {action_text}\n\n"
+                            f"Стартуем?\n\n"
+                            f"<blockquote>💰 Ваш баланс: {user_balance:.2f} ₽</blockquote>",
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
+                    else:
+                        # Баланса всё ещё недостаточно
+                        keyboard = InlineKeyboardMarkup(
+                            inline_keyboard=[
+                                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                            ]
+                        )
+                        
+                        await bot.send_message(
+                            user_id,
+                            f"💫 Оплата прошла успешно\n\n"
+                            f"<blockquote>Мой текущий баланс: {user_balance:.2f} ₽</blockquote>",
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
+                else:
+                    # Нет pending action - просто показываем баланс
+                    keyboard = InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                        ]
+                    )
+                    
+                    await bot.send_message(
+                        user_id,
+                        f"💫 Оплата прошла успешно\n\n"
+                        f"<blockquote>Мой текущий баланс: {user_balance:.2f} ₽</blockquote>",
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                
                 logger.info(f"✅ Уведомление отправлено пользователю {user_id}")
             except Exception as e:
                 logger.error(f"Ошибка отправки уведомления пользователю: {e}")
