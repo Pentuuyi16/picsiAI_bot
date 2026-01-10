@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, URLInputFile
+from aiogram.types import CallbackQuery, URLInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.inline import get_cabinet_keyboard, get_main_menu_keyboard
 
 router = Router()
@@ -147,16 +147,22 @@ async def top_up_balance_cabinet_handler(callback: CallbackQuery):
 async def documents_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Документы'"""
     text = (
-        "📑 <b>Юридические документы</b>\n\n"
-        "• Политика конфиденциальности\n"
-        "• Согласие на обработку персональных данных\n"
-        "• Договор оферты\n\n"
-        "Документы будут добавлены позже."
+        "Начав работу с ботом, вы подтверждаете согласие с документами, указанными ниже ⤵️\n\n"
+        "📌 <a href='https://docs.google.com/document/d/1a5VvZ6Y9O6dNzEks0FeWaV-ch6u0x_uIj1Tl3fCKkKI/edit?tab=t.0'>Политика конфиденциальности</a>\n\n"
+        "📌 <a href='https://docs.google.com/document/d/1X74L-4BtUrrxbuHUIPlw1QfrNV8_c6L92YD0h_Srpug/edit?tab=t.0'>Согласие на обработку персональных данных</a>\n\n"
+        "📌 <a href='https://docs.google.com/document/d/1ik6H8r3mc2vLQWqce_Yc9evrd5shACcdr3um8jOYV6o/edit?tab=t.0#heading=h.448sylidj6gd'>Договор оферты</a>"
+    )
+    
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="personal_cabinet")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
     )
     
     await callback.message.edit_text(
         text,
         parse_mode="HTML",
-        reply_markup=get_main_menu_keyboard()
+        reply_markup=keyboard
     )
     await callback.answer()

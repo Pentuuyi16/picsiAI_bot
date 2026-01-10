@@ -10,7 +10,8 @@ from keyboards.inline import (
     get_start_action_keyboard,
     get_edit_aspect_ratio_keyboard,
     get_video_format_keyboard,
-    get_main_menu_keyboard
+    get_main_menu_keyboard,
+    get_cabinet_keyboard
 )
 
 router = Router()
@@ -181,7 +182,7 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
         "3️⃣ <b><i>Подождите всего пару минут</i></b> — и получите изображение с качественным редактированием.\n\n"
         "Ваши <b><i>фото</i></b> могут выглядеть ещё лучше 💫\n\n"
         f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"🎨 Редактирование 1 изображения = 35₽</blockquote>"
+        f"🎨 Редактирование 1 изображения = 25₽</blockquote>"
     )
     
     # Удаляем старое сообщение
@@ -192,7 +193,8 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
     
     # Отправляем новое с видео
     from handlers.image_editing import EXAMPLE_VIDEO_FILE_ID
-    await callback.message.answer_video(
+    await callback.bot.send_video(
+        chat_id=callback.message.chat.id,
         video=EXAMPLE_VIDEO_FILE_ID,
         caption=text,
         parse_mode="HTML",
@@ -201,47 +203,38 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == "amount_1")
-async def amount_1_handler(callback: CallbackQuery):
-    """Обработчик выбора суммы 1₽"""
-    from utils.yookassa_client import YooKassaClient
+@router.callback_query(F.data == "back_to_personal_cabinet")
+async def back_to_personal_cabinet_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Назад' - возврат в личный кабинет"""
     from database.database import Database
     
     user_id = callback.from_user.id
-    amount = 1.00
     
-    # Создаём платёж через YooKassa
-    yookassa = YooKassaClient()
-    payment_data = await yookassa.create_payment(
-        amount=amount,
-        description=f"Пополнение баланса на {amount}₽",
-        user_id=user_id
+    # Получаем баланс из БД
+    db = Database()
+    user = db.get_user(user_id)
+    balance = user['balance'] if user else 0.00
+    
+    text = (
+        "<b>✨ Личный кабинет</b>\n\n"
+        "В этом разделе собраны все важные инструменты и информация, связанные с вашим профилем.\n\n"
+        "<b>📁 Файлы</b>\n"
+        "Все ваши готовые и созданные материалы 🔥\n\n"
+        "<b>💰 Баланс</b>\n"
+        "Пополнение и управление средствами 💳\n\n"
+        "<b>📑 Юридическая информация</b>\n"
+        "Политика конфиденциальности\n"
+        "Согласие на ОПД\n"
+        "Договор оферты 🛡️\n\n"
+        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽</blockquote>"
     )
     
-    # Сохраняем платёж в БД
-    if payment_data and payment_data.get("payment_id"):
-        db = Database()
-        db.save_payment(payment_data["payment_id"], user_id, amount)
-    
-    if payment_data and payment_data.get("confirmation_url"):
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="💳 Перейти к оплате", url=payment_data["confirmation_url"])],
-                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
-            ]
-        )
-        
-        await callback.message.answer(
-            f"<b>Сумма к оплате {amount}₽</b>\n\n"
-            f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
-    else:
-        await callback.message.answer(
-            "❌ Произошла ошибка при создании платежа. Попробуйте позже."
-        )
-    
+    # Редактируем сообщение
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_cabinet_keyboard()
+    )
     await callback.answer()
 
 
@@ -258,7 +251,7 @@ async def amount_80_handler(callback: CallbackQuery):
     yookassa = YooKassaClient()
     payment_data = await yookassa.create_payment(
         amount=amount,
-        description=f"Пополнение баланса на {amount}₽",
+        description=f"Пополнение баланса на {int(amount)}₽",
         user_id=user_id
     )
     
@@ -276,7 +269,7 @@ async def amount_80_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"<b>Сумма к оплате {int(amount)}₽</b>\n\n"
             f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
             parse_mode="HTML",
             reply_markup=keyboard
@@ -302,7 +295,7 @@ async def amount_160_handler(callback: CallbackQuery):
     yookassa = YooKassaClient()
     payment_data = await yookassa.create_payment(
         amount=amount,
-        description=f"Пополнение баланса на {amount}₽",
+        description=f"Пополнение баланса на {int(amount)}₽",
         user_id=user_id
     )
     
@@ -320,7 +313,7 @@ async def amount_160_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"<b>Сумма к оплате {int(amount)}₽</b>\n\n"
             f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
             parse_mode="HTML",
             reply_markup=keyboard
@@ -346,7 +339,7 @@ async def amount_320_handler(callback: CallbackQuery):
     yookassa = YooKassaClient()
     payment_data = await yookassa.create_payment(
         amount=amount,
-        description=f"Пополнение баланса на {amount}₽",
+        description=f"Пополнение баланса на {int(amount)}₽",
         user_id=user_id
     )
     
@@ -364,7 +357,7 @@ async def amount_320_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"<b>Сумма к оплате {int(amount)}₽</b>\n\n"
             f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
             parse_mode="HTML",
             reply_markup=keyboard
@@ -390,7 +383,7 @@ async def amount_640_handler(callback: CallbackQuery):
     yookassa = YooKassaClient()
     payment_data = await yookassa.create_payment(
         amount=amount,
-        description=f"Пополнение баланса на {amount}₽",
+        description=f"Пополнение баланса на {int(amount)}₽",
         user_id=user_id
     )
     
@@ -408,7 +401,7 @@ async def amount_640_handler(callback: CallbackQuery):
         )
         
         await callback.message.answer(
-            f"<b>Сумма к оплате {amount}₽</b>\n\n"
+            f"<b>Сумма к оплате {int(amount)}₽</b>\n\n"
             f"  ✨ Подтверждение об успешной оплате приходит в течение нескольких минут (в некоторых случаях в течение часа)",
             parse_mode="HTML",
             reply_markup=keyboard

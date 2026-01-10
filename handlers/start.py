@@ -93,16 +93,24 @@ async def main_menu_handler(callback):
     from keyboards.inline import get_main_menu_keyboard
     from utils.texts import TEXTS
     
-    # Удаляем старое сообщение
+    # Пытаемся отредактировать сообщение
     try:
-        await callback.message.delete()
+        await callback.message.edit_text(
+            TEXTS['welcome_message'],
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode="HTML"
+        )
     except:
-        pass
+        # Если не получилось (например, сообщение с видео), удаляем и отправляем новое
+        try:
+            await callback.message.delete()
+        except:
+            pass
+        
+        await callback.message.answer(
+            TEXTS['welcome_message'],
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode="HTML"
+        )
     
-    # Отправляем новое
-    await callback.message.answer(
-        TEXTS['welcome_message'],
-        reply_markup=get_main_menu_keyboard(),
-        parse_mode="HTML"
-    )
     await callback.answer()

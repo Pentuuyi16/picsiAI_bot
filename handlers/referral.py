@@ -1,6 +1,7 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from config import BOT_USERNAME
+import os
 
 router = Router()
 
@@ -44,10 +45,52 @@ async def referral_system_handler(callback: CallbackQuery):
         ]
     )
     
-    await callback.message.edit_text(
-        text,
-        parse_mode="HTML",
-        reply_markup=keyboard
-    )
+    # Удаляем старое сообщение
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    
+    # Пытаемся найти файл с разными расширениями
+    photo_path = None
+    for ext in ['jpg', 'jpeg', 'png', 'JPG', 'JPEG', 'PNG']:
+        test_path = f"рефералка.{ext}"
+        if os.path.exists(test_path):
+            photo_path = test_path
+            print(f"✅ Найден файл: {photo_path}")
+            break
+    
+    # Если файл не найден, проверяем без расширения
+    if not photo_path and os.path.exists("рефералка"):
+        photo_path = "рефералка"
+        print(f"✅ Найден файл: {photo_path}")
+    
+    # Отправляем сообщение
+    try:
+        if photo_path:
+            # Отправляем с фото
+            photo = FSInputFile(photo_path)
+            await callback.message.answer_photo(
+                photo=photo,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+        else:
+            # Если фото не найдено, отправляем только текст
+            print("⚠️ Файл рефералка не найден, отправляем текст без фото")
+            await callback.message.answer(
+                text,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+    except Exception as e:
+        print(f"❌ Ошибка при отправке: {e}")
+        # Если ошибка с фото, отправляем только текст
+        await callback.message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
     
     await callback.answer()

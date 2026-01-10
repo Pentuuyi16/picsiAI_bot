@@ -5,7 +5,7 @@ def get_agreement_keyboard() -> InlineKeyboardMarkup:
     """Создаёт инлайн-клавиатуру для подтверждения согласия"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_agreement")]
+            [InlineKeyboardButton(text="✅ Принимаю", callback_data="confirm_agreement")]
         ]
     )
     return keyboard
@@ -21,8 +21,8 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
             ],
             [InlineKeyboardButton(text="🎨 Редактирование изображений", callback_data="image_editing")],
             [InlineKeyboardButton(text="💎 Реферальная система", callback_data="referral_system")],
-            [InlineKeyboardButton(text="💬 Написать в поддержку", callback_data="support")],
-            [InlineKeyboardButton(text="👤 Личный кабинет", callback_data="personal_cabinet")]
+            [InlineKeyboardButton(text="Написать в поддержку", callback_data="support")],
+            [InlineKeyboardButton(text="Личный кабинет", callback_data="personal_cabinet")]
         ]
     )
     return keyboard
@@ -86,7 +86,6 @@ def get_balance_amounts_keyboard(back_to: str = "photo_animation") -> InlineKeyb
     """Создаёт клавиатуру с суммами для пополнения"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="1₽", callback_data="amount_1")],
             [
                 InlineKeyboardButton(text="80₽", callback_data="amount_80"),
                 InlineKeyboardButton(text="160₽", callback_data="amount_160"),
