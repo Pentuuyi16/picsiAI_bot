@@ -615,6 +615,8 @@ async def start_action_handler(callback: CallbackQuery):
                             )
                             await processing_msg.delete()
                             print("✅ Видео успешно отправлено")
+                            
+                            db.save_generation(user_id, "video_generation", video_url, prompt)
                         except Exception as e:
                             logger.error(f"Ошибка отправки видео: {e}")
                             await processing_msg.edit_text(
@@ -649,3 +651,104 @@ async def start_action_handler(callback: CallbackQuery):
                 await processing_msg.edit_text("❌ Произошла ошибка при генерации.")
             except:
                 await callback.message.answer("❌ Произошла ошибка при генерации.")
+    
+    elif action_type == "image_editing_pending":
+        # Редактирование изображения
+        state_data = action_data.get("state_data", {})
+        prompt = action_data.get("prompt")
+        
+        aspect_ratio = state_data.get("edit_aspect_ratio", "1:1")
+        resolution = state_data.get("edit_quality", "1K")
+        photos = state_data.get("edit_photos", [])
+        
+        required_amount = 25.00
+        
+        if balance < required_amount:
+            await callback.message.answer("❌ Недостаточно средств для редактирования изображения")
+            return
+        
+        processing_msg = await callback.message.answer(
+            "⭐ Начинается редактирование изображения, совсем скоро пришлем результат"
+        )
+        
+        try:
+            edit_client = ImageEditClient()
+            
+            task_id = await edit_client.create_edit_task(
+                prompt=prompt,
+                image_urls=photos,
+                aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                output_format="png"
+            )
+            
+            if task_id:
+                image_url = await edit_client.wait_for_result(task_id, max_attempts=120, delay=5)
+                
+                if image_url:
+                    if image_url == "MODERATION_ERROR":
+                        # Ошибка модерации - баланс НЕ списывается
+                        await processing_msg.edit_text(
+                            "😔 Упс! Не получилось отредактировать изображение\n\n"
+                            "Система безопасности заблокировала запрос.\n\n"
+                            "Частые причины:\n"
+                            "• На фото известная личность\n"
+                            "• В описании есть неподходящий контент\n\n"
+                            "💡 Совет: используйте обычные фотографии и нейтральные описания\n\n"
+                            "💛 Не переживайте, баланс не пострадал"
+                        )
+                    else:
+                        # Успешная генерация - списываем средства
+                        new_balance = balance - required_amount
+                        db.update_user_balance(user_id, new_balance)
+                        
+                        # Отправляем изображение
+                        try:
+                            image_file = URLInputFile(image_url)
+                            await callback.bot.send_photo(
+                                chat_id=callback.message.chat.id,
+                                photo=image_file,
+                                caption="✨ Ваше изображение готово!",
+                                request_timeout=180
+                            )
+                            await processing_msg.delete()
+                            print("✅ Изображение успешно отправлено")
+                            
+                            db.save_generation(user_id, "image_editing", image_url, prompt)
+                        except Exception as e:
+                            logger.error(f"Ошибка отправки изображения: {e}")
+                            await processing_msg.edit_text(
+                                "❌ Не удалось отправить изображение. Попробуйте позже."
+                            )
+                    
+                    await callback.message.answer(
+                        TEXTS['welcome_message'],
+                        reply_markup=get_main_menu_keyboard(),
+                        parse_mode="HTML"
+                    )
+                else:
+                    await processing_msg.edit_text(
+                        "😔 Что-то пошло не так\n\n"
+                        "Не удалось отредактировать изображение. Возможные причины:\n"
+                        "• Превышено время ожидания\n"
+                        "• Временные проблемы с сервером\n\n"
+                        "💡 Попробуйте ещё раз через пару минут\n\n"
+                        "💛 Не переживайте, баланс не пострадал"
+                    )
+                    
+                    await callback.message.answer(
+                        TEXTS['welcome_message'],
+                        reply_markup=get_main_menu_keyboard(),
+                        parse_mode="HTML"
+                    )
+            else:
+                await processing_msg.edit_text("❌ Не удалось создать задачу.")
+        except Exception as e:
+            logger.error(f"Ошибка: {e}", exc_info=True)
+            try:
+                await processing_msg.edit_text("❌ Произошла ошибка при редактировании.")
+            except:
+                await callback.message.answer("❌ Произошла ошибка при редактировании.")
+    
+    # Очищаем pending action после выполнения
+    db.clear_pending_action(user_id)
