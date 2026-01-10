@@ -41,7 +41,6 @@ async def personal_cabinet_handler(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "my_photos")
-@router.callback_query(F.data == "my_photos")
 async def my_photos_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Мои фото'"""
     from database.database import Database
@@ -55,7 +54,7 @@ async def my_photos_handler(callback: CallbackQuery):
         await callback.answer("У вас пока нет оживлённых фото", show_alert=True)
         return
     
-    await callback.message.answer(f"📸 Ваши оживлённые фото ({len(photos)} шт):")
+    await callback.message.answer(f"Ваши оживлённые фотографии ({len(photos)})")
     
     for photo_url, prompt, created_at in photos:
         try:
@@ -84,7 +83,7 @@ async def my_videos_handler(callback: CallbackQuery):
         await callback.answer("У вас пока нет сгенерированных видео", show_alert=True)
         return
     
-    await callback.message.answer(f"📹 Ваши видео ({len(videos)} шт):")
+    await callback.message.answer(f"Ваши видео ({len(videos)})")
     
     for video_url, prompt, created_at in videos:
         try:
@@ -113,7 +112,7 @@ async def my_edited_images_handler(callback: CallbackQuery):
         await callback.answer("У вас пока нет отредактированных изображений", show_alert=True)
         return
     
-    await callback.message.answer(f"🎨 Ваши отредактированные изображения ({len(images)} шт):")
+    await callback.message.answer(f"Ваши отредактированные изображения ({len(images)})")
     
     for image_url, prompt, created_at in images:
         try:

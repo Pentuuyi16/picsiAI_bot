@@ -126,7 +126,7 @@ async def yookassa_webhook(request):
                         await bot.send_message(
                             user_id,
                             f"{action_emoji} Мы готовы начинать {action_text}\n\n"
-                            f"Стартуем?\n\n"
+                            f"Стартуем?\n"
                             f"<blockquote>💰 Ваш баланс: {user_balance:.2f} ₽</blockquote>",
                             parse_mode="HTML",
                             reply_markup=keyboard
