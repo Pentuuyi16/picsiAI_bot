@@ -19,7 +19,7 @@ edit_client = ImageEditClient()
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAOQaWKxmNKTE6JfS36UQjLMHW5VljcAAiWhAAJruRhLvDli2rTEXlg4BA"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAICO2liyr_MOOoghDYiIXaVhGJ5lzr4AAKjlQACHwgRSxI0RKJUQwH6OAQ"
 
 
 # Временное хранилище для обработанных медиа-групп (по user_id)

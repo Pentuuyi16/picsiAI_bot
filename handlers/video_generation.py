@@ -12,7 +12,7 @@ veo_client = VeoApiClient()
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера (можете использовать тот же или другой)
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAOOaWKxkxxtAnOkT9isrkGzQOKwpJAAAiShAAJruRhLc1eNAAFYgu62OAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAICOWliyrkW2VoFvDmD83_PhWyyPlc4AAKilQACHwgRSznC2mae-hHUOAQ"
 
 # Временное хранилище для обработанных медиа-групп
 processed_media_groups = {}
