@@ -25,7 +25,7 @@ class KieApiClient:
         payload = {
             "model": "grok-imagine/image-to-video",
             "input": {
-                "image_urls": [image_url],  # Массив URL изображений
+                "image_urls": [image_url],
                 "prompt": prompt,
                 "mode": mode
             }
@@ -98,47 +98,77 @@ class KieApiClient:
         Returns:
             URL видео если успешно, None если ошибка или таймаут
         """
-        print(f"⏳ Ожидание завершения задачи {task_id}...")
+        print(f"\n{'='*70}")
+        print(f"⏳ ОЖИДАНИЕ ЗАВЕРШЕНИЯ ЗАДАЧИ ОЖИВЛЕНИЯ ФОТО")
+        print(f"Task ID: {task_id}")
+        print(f"Max attempts: {max_attempts}")
+        print(f"Delay: {delay}s")
+        print(f"{'='*70}\n")
         
         for attempt in range(max_attempts):
+            print(f"\n--- Попытка {attempt + 1}/{max_attempts} ---")
+            
             status_data = await self.get_task_status(task_id)
             
             if not status_data:
+                print(f"❌ status_data is None, ждём...")
                 await asyncio.sleep(delay)
                 continue
             
             state = status_data.get("state")
+            print(f"📊 State: {state}")
             
-            # Выводим прогресс каждые 6 попыток (примерно раз в 30 секунд)
+            # Выводим полный ответ для отладки каждые 6 попыток
             if attempt % 6 == 0:
-                print(f"⏳ Проверка {attempt + 1}/{max_attempts}: {state}...")
+                print(f"\n📋 Полный ответ API (попытка {attempt + 1}):")
+                print(json.dumps(status_data, indent=2, ensure_ascii=False))
             
             if state == "success":
-                print("🎉 Оживление фото завершено!")
+                print(f"\n{'='*70}")
+                print(f"🎉 ОЖИВЛЕНИЕ ФОТО ЗАВЕРШЕНО УСПЕШНО!")
+                print(f"{'='*70}\n")
                 
                 # Парсим resultJson
                 result_json_str = status_data.get("resultJson")
                 
+                print(f"📦 resultJson type: {type(result_json_str)}")
+                print(f"📦 resultJson value: {result_json_str}")
+                
                 if result_json_str:
                     try:
                         if isinstance(result_json_str, str):
+                            print(f"🔄 Парсим JSON строку...")
                             result_json = json.loads(result_json_str)
                         else:
+                            print(f"✅ resultJson уже dict")
                             result_json = result_json_str
+                        
+                        print(f"📄 Parsed result_json:")
+                        print(json.dumps(result_json, indent=2, ensure_ascii=False))
                         
                         # Получаем URL видео
                         result_urls = result_json.get("resultUrls", [])
                         
+                        print(f"🔗 resultUrls: {result_urls}")
+                        print(f"🔗 resultUrls length: {len(result_urls) if result_urls else 0}")
+                        
                         if result_urls and len(result_urls) > 0:
                             video_url = result_urls[0]
-                            print(f"🎬 Видео готово: {video_url}")
+                            print(f"\n{'='*70}")
+                            print(f"🎬 ВИДЕО ГОТОВО!")
+                            print(f"URL: {video_url}")
+                            print(f"{'='*70}\n")
                             return video_url
                         else:
-                            print("⚠️ resultUrls пуст")
+                            print("⚠️ resultUrls пуст или не найден")
                             print(f"Full resultJson: {result_json}")
                     except Exception as e:
                         print(f"⚠️ Ошибка парсинга resultJson: {e}")
                         print(f"resultJson value: {result_json_str}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f"⚠️ resultJson is None или пустой")
                 
                 print("⚠️ Видео готово, но URL не найден")
                 return None
@@ -146,7 +176,12 @@ class KieApiClient:
             elif state == "fail":
                 fail_code = status_data.get("failCode", "")
                 fail_msg = status_data.get("failMsg", "")
-                print(f"❌ Ошибка при оживлении фото: [{fail_code}] {fail_msg}")
+                
+                print(f"\n{'='*70}")
+                print(f"❌ ОШИБКА ПРИ ОЖИВЛЕНИИ ФОТО")
+                print(f"Fail Code: {fail_code}")
+                print(f"Fail Message: {fail_msg}")
+                print(f"{'='*70}\n")
     
                 # Проверяем ошибки модерации
                 fail_msg_lower = fail_msg.lower()
@@ -157,4 +192,17 @@ class KieApiClient:
                     print(f"🚫 Контент заблокирован модерацией")
                     return "MODERATION_ERROR"
     
+                return None
+            
+            elif state in ["waiting", "queuing", "generating"]:
+                print(f"⏳ Генерация в процессе (state: {state})...")
+                await asyncio.sleep(delay)
+            else:
+                print(f"⚠️ Неизвестный state: {state}")
+                await asyncio.sleep(delay)
+        
+        print(f"\n{'='*70}")
+        print(f"❌ ПРЕВЫШЕНО ВРЕМЯ ОЖИДАНИЯ")
+        print(f"Проверено попыток: {max_attempts}")
+        print(f"{'='*70}\n")
         return None
