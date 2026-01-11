@@ -54,8 +54,7 @@ async def my_photos_handler(callback: CallbackQuery):
         await callback.answer("У вас пока нет оживлённых фото", show_alert=True)
         return
     
-    await callback.message.answer(f"Ваши оживлённые фотографии ({len(photos)})")
-    
+    # Сначала отправляем все видео
     for photo_url, prompt, created_at in photos:
         try:
             video_file = URLInputFile(photo_url)
@@ -65,6 +64,18 @@ async def my_photos_handler(callback: CallbackQuery):
             )
         except Exception as e:
             print(f"Ошибка отправки фото: {e}")
+    
+    # В конце отправляем текст с кнопкой
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    
+    await callback.message.answer(
+        f"Ваши оживлённые фотографии ({len(photos)})",
+        reply_markup=keyboard
+    )
     
     await callback.answer()
 
@@ -83,8 +94,7 @@ async def my_videos_handler(callback: CallbackQuery):
         await callback.answer("У вас пока нет сгенерированных видео", show_alert=True)
         return
     
-    await callback.message.answer(f"Ваши видео ({len(videos)})")
-    
+    # Сначала отправляем все видео
     for video_url, prompt, created_at in videos:
         try:
             video_file = URLInputFile(video_url)
@@ -94,6 +104,18 @@ async def my_videos_handler(callback: CallbackQuery):
             )
         except Exception as e:
             print(f"Ошибка отправки видео: {e}")
+    
+    # В конце отправляем текст с кнопкой
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    
+    await callback.message.answer(
+        f"Ваши видео ({len(videos)})",
+        reply_markup=keyboard
+    )
     
     await callback.answer()
 
