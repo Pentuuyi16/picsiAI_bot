@@ -102,6 +102,10 @@ async def my_videos_handler(callback: CallbackQuery):
 async def my_edited_images_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Мои отредактированные изображения'"""
     from database.database import Database
+    import aiohttp
+    from PIL import Image
+    from io import BytesIO
+    from aiogram.types import BufferedInputFile
     
     user_id = callback.from_user.id
     db = Database()
@@ -116,13 +120,54 @@ async def my_edited_images_handler(callback: CallbackQuery):
     
     for image_url, prompt, created_at in images:
         try:
-            image_file = URLInputFile(image_url)
+            print(f"📤 Отправка изображения: {image_url}")
+            
+            # Скачиваем и сжимаем изображение
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url) as response:
+                    image_data = await response.read()
+                    original_size_mb = len(image_data) / (1024 * 1024)
+                    print(f"   Размер: {original_size_mb:.2f} MB")
+            
+            # Если файл больше 9 МБ - сжимаем
+            if original_size_mb > 9.0:
+                print(f"   🔧 Сжимаем изображение...")
+                img = Image.open(BytesIO(image_data))
+                
+                # Конвертируем в RGB
+                if img.mode in ('RGBA', 'P', 'LA'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                
+                # Сжимаем до 9 МБ
+                output = BytesIO()
+                quality = 85
+                while quality > 20:
+                    output.seek(0)
+                    output.truncate()
+                    img.save(output, format='JPEG', quality=quality, optimize=True)
+                    size_mb = output.tell() / (1024 * 1024)
+                    if size_mb <= 9.0:
+                        break
+                    quality -= 5
+                
+                output.seek(0)
+                image_file = BufferedInputFile(output.read(), filename="image.jpg")
+                print(f"   ✅ Сжато до {size_mb:.2f} MB")
+            else:
+                # Файл уже маленький - отправляем как есть
+                image_file = URLInputFile(image_url)
+            
             await callback.bot.send_photo(
                 chat_id=callback.message.chat.id,
                 photo=image_file
             )
+            print(f"   ✅ Отправлено")
         except Exception as e:
-            print(f"Ошибка отправки изображения: {e}")
+            print(f"❌ Ошибка отправки изображения: {e}")
     
     await callback.answer()
 
