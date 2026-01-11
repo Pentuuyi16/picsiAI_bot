@@ -116,8 +116,7 @@ async def my_edited_images_handler(callback: CallbackQuery):
         await callback.answer("У вас пока нет отредактированных изображений", show_alert=True)
         return
     
-    await callback.message.answer(f"Ваши отредактированные изображения ({len(images)})")
-    
+    # Сначала отправляем все фотки
     for image_url, prompt, created_at in images:
         try:
             print(f"📤 Отправка изображения: {image_url}")
@@ -168,6 +167,18 @@ async def my_edited_images_handler(callback: CallbackQuery):
             print(f"   ✅ Отправлено")
         except Exception as e:
             print(f"❌ Ошибка отправки изображения: {e}")
+    
+    # В конце отправляем текст с кнопкой
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    
+    await callback.message.answer(
+        f"Ваши отредактированные изображения ({len(images)})",
+        reply_markup=keyboard
+    )
     
     await callback.answer()
 
