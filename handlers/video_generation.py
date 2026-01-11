@@ -2,6 +2,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, Message, URLInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.inline import get_video_generation_keyboard, get_video_format_keyboard, get_aspect_ratio_keyboard, get_main_menu_keyboard
 from utils.veo_api_client import VeoApiClient
 from utils.texts import TEXTS
@@ -12,7 +13,7 @@ veo_client = VeoApiClient()
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера (можете использовать тот же или другой)
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAICOWliyrkW2VoFvDmD83_PhWyyPlc4AAKilQACHwgRSznC2mae-hHUOAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIElGlj8dbND1W6tlWJrfQP6i7i4VfEAAICnQACHSMgSyTAsGEYaRTEOAQ"
 
 # Временное хранилище для обработанных медиа-групп
 processed_media_groups = {}
@@ -483,9 +484,18 @@ async def back_to_video_format_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "video_instruction_generation")
 async def video_instruction_generation_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Видео-инструкция' в разделе создания видео"""
-    await callback.message.answer(
-        "📹 Видео-инструкция\n\n"
-        "Здесь будет видео-инструкция по созданию видео."
+    """Обработчик кнопки 'Видео-инструкция' в разделе генерации видео"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="video_generation")]
+        ]
+    )
+    
+    await callback.message.answer_video(
+        video="BAACAgIAAxkBAAIElmlj8d5SR3hTYL-7rDBf6FFWJy-4AAIDnQACHSMgS8HzgmFm3p1LOAQ",
+        caption="<b>📹 Видео-инструкция по генерации видео</b>\n\n"
+                "Всего пару минут — и вы узнаете, как добиться качественного и эффектного результата ✨",
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
     await callback.answer()

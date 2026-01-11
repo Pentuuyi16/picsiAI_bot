@@ -1,5 +1,6 @@
 from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, Message, URLInputFile, FSInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from keyboards.inline import get_photo_animation_keyboard, get_main_menu_keyboard
@@ -11,7 +12,7 @@ router = Router()
 api_client = KieApiClient()
 
 # File ID вашего видео-примера
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAICL2liylQCT4kSjtyMilQIDAQygbugAAKglQACHwgRSwa-Te4iOYYaOAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIEimlj8ZTNZmenDet8cR2jrI4FrQbTAAL9nAACHSMgS6zLQxgXQgKgOAQ"
 
 
 class PhotoAnimationStates(StatesGroup):
@@ -60,20 +61,29 @@ async def animate_photo_handler(callback: CallbackQuery, state: FSMContext):
     # Путь к примеру фото (положите файл пример.jpg в корень проекта)
     example_photo_path = "example_photo.jpg"
     
+    # Кнопка "Назад"
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="photo_animation")]
+        ]
+    )
+    
     # Проверяем существует ли файл
     if os.path.exists(example_photo_path):
         photo = FSInputFile(example_photo_path)
         await callback.message.answer_photo(
             photo=photo,
             caption="<b>Пример ⤴️</b>\n\nПришлите <b><i>фотографию</i></b>, которую хотите оживить ✨🎬",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=keyboard
         )
     else:
         # Если файла нет, отправляем просто текст
         await callback.message.answer(
             "<b>Пример ⤴️</b>\n\n"
             "Пришлите <b><i>фотографию</i></b>, которую хотите оживить ✨🎬",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=keyboard
         )
     
     await state.set_state(PhotoAnimationStates.waiting_for_photo)
@@ -310,8 +320,17 @@ async def process_invalid_prompt(message: Message):
 @router.callback_query(F.data == "video_instruction")
 async def video_instruction_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Видео-инструкция'"""
-    await callback.message.answer(
-        "📹 Видео-инструкция\n\n"
-        "Здесь будет видео-инструкция по использованию бота."
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="photo_animation")]
+        ]
+    )
+    
+    await callback.message.answer_video(
+        video="BAACAgIAAxkBAAIEjGlj8Z8gbLE9fhyegRNAnQW3gCmnAAL-nAACHSMgS9w6BMnXVrvhOAQ",
+        caption="<b>📹 Видео-инструкция по оживлению фото</b>\n\n"
+                "Всего пару минут — и вы узнаете, как добиться качественного и эффектного результата ✨",
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
     await callback.answer()

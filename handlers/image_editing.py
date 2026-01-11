@@ -2,6 +2,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, Message, URLInputFile, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.inline import (
     get_image_editing_keyboard, 
     get_edit_aspect_ratio_keyboard, 
@@ -22,7 +23,7 @@ edit_client = ImageEditClient()
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAICO2liyr_MOOoghDYiIXaVhGJ5lzr4AAKjlQACHwgRSxI0RKJUQwH6OAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIEmGlj8f7yzyPbC7aOUAgsXnDojYLXAAIHnQACHSMgS6L_T5Q94hmLOAQ"
 
 
 # Временное хранилище для обработанных медиа-групп (по user_id)
@@ -185,12 +186,19 @@ async def edit_quality_handler(callback: CallbackQuery, state: FSMContext):
     aspect_ratio = data.get("edit_aspect_ratio", "1:1")
     aspect_name = "квадратное" if aspect_ratio == "1:1" else "вертикальное" if aspect_ratio == "9:16" else "горизонтальное"
     
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    
     await callback.message.edit_text(
         f"<b>✨ Всё настроено!</b>\n\n"
         f"<blockquote>📐 Соотношение: {aspect_name}\n"
         f"🎨 Качество: {quality}</blockquote>\n\n"
         f"📷 Теперь <b><i>загрузите фото</i></b>, которое хотите отредактировать (можно до 8 фото)",
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
     await state.set_state(ImageEditingStates.waiting_for_photos)
     await callback.answer()
@@ -450,8 +458,17 @@ async def back_to_edit_aspect_handler(callback: CallbackQuery, state: FSMContext
 @router.callback_query(F.data == "video_instruction_editing")
 async def video_instruction_editing_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Видео-инструкция' в разделе редактирования"""
-    await callback.message.answer(
-        "📹 Видео-инструкция\n\n"
-        "Здесь будет видео-инструкция по редактированию изображений."
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="image_editing")]
+        ]
+    )
+    
+    await callback.message.answer_video(
+        video="BAACAgIAAxkBAAIEm2lj89wQUbrn5anGqPd_m0MfSz8OAAIunQACHSMgSwihmsAAAVHFmzgE",  # Вставь file_id видео-инструкции
+        caption="<b>📹 Видео-инструкция по редактированию изображений</b>\n\n"
+                "Всего пару минут — и вы узнаете, как добиться качественного и эффектного результата ✨",
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
     await callback.answer()
