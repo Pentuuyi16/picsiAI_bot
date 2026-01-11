@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.types import BotCommand
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
 from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support
@@ -21,6 +22,16 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+    
+    # Настраиваем команды бота (меню)
+    commands = [
+        BotCommand(command="menu", description="Главное меню"),
+        BotCommand(command="pay", description="Пополнить счёт"),
+        BotCommand(command="cabinet", description="Личный кабинет"),
+        BotCommand(command="help", description="Поддержка")
+    ]
+    await bot.set_my_commands(commands)
+    logger.info("✅ Команды бота настроены")
     
     # Подключаем роутеры из handlers
     dp.include_router(start.router)

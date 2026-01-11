@@ -1,6 +1,6 @@
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 router = Router()
 
@@ -114,3 +114,78 @@ async def main_menu_handler(callback):
         )
     
     await callback.answer()
+
+
+@router.message(Command("menu"))
+async def menu_command_handler(message: Message):
+    """Обработчик команды /menu"""
+    from keyboards.inline import get_main_menu_keyboard
+    from utils.texts import TEXTS
+    
+    await message.answer(
+        TEXTS['welcome_message'],
+        reply_markup=get_main_menu_keyboard(),
+        parse_mode="HTML"
+    )
+
+
+@router.message(Command("pay"))
+async def pay_command_handler(message: Message):
+    """Обработчик команды /pay"""
+    from keyboards.inline import get_balance_amounts_keyboard
+    
+    await message.answer(
+        "💰 Выберите сумму для пополнения:",
+        reply_markup=get_balance_amounts_keyboard(back_to="main_menu")
+    )
+
+
+@router.message(Command("cabinet"))
+async def lk_command_handler(message: Message):
+    """Обработчик команды cabinet (личный кабинет)"""
+    from database.database import Database
+    from keyboards.inline import get_cabinet_keyboard
+    
+    user_id = message.from_user.id
+    
+    db = Database()
+    user = db.get_user(user_id)
+    balance = user['balance'] if user else 0.00
+    
+    text = (
+        "<b>✨ Личный кабинет</b>\n\n"
+        "В этом разделе собраны все важные инструменты и информация, связанные с вашим профилем.\n\n"
+        "<b>📁 Файлы</b>\n"
+        "Все ваши готовые и созданные материалы 🔥\n\n"
+        "<b>💰 Баланс</b>\n"
+        "Пополнение и управление средствами 💳\n\n"
+        "<b>📑 Юридическая информация</b>\n"
+        "Политика конфиденциальности\n"
+        "Согласие на ОПД\n"
+        "Договор оферты 🛡️\n\n"
+        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽</blockquote>"
+    )
+    
+    await message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_cabinet_keyboard()
+    )
+
+
+@router.message(Command("help"))
+async def help_command_handler(message: Message):
+    """Обработчик команды /help (поддержка)"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    
+    await message.answer(
+        "<b>💬 Поддержка</b>\n\n"
+        "Возникли вопросы? Напишите нам — разберёмся вместе\n"
+        "https://t.me/PicsiSupport",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
