@@ -43,16 +43,6 @@ async def main():
     dp.include_router(cabinet.router)
     dp.include_router(support.router)
     
-    # Временный обработчик для получения file_id видео
-    from aiogram import F
-    from aiogram.types import Message
-    
-    @dp.message(F.video)
-    async def get_video_file_id(message: Message):
-        """Временный обработчик для получения file_id видео"""
-        file_id = message.video.file_id
-        await message.answer(f"Video File ID:\n`{file_id}`", parse_mode="Markdown")
-        print(f"📹 Video File ID: {file_id}")
     
     logger.info("🚀 Бот запущен")
     
