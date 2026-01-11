@@ -1,5 +1,5 @@
 from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery, Message, URLInputFile
+from aiogram.types import CallbackQuery, Message, URLInputFile, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from keyboards.inline import (
@@ -11,6 +11,9 @@ from keyboards.inline import (
 from utils.image_edit_client import ImageEditClient
 from utils.texts import TEXTS
 import logging
+import aiohttp
+from PIL import Image
+from io import BytesIO
 
 media_group_photos = {}
 
@@ -35,6 +38,67 @@ class ImageEditingStates(StatesGroup):
     waiting_for_quality = State()
     waiting_for_photos = State()
     waiting_for_description = State()
+
+
+async def compress_image(image_url: str, max_size_mb: float = 10.0, quality: int = 85) -> BufferedInputFile:
+    """
+    Скачивает и сжимает изображение для отправки в Telegram
+    
+    Args:
+        image_url: URL изображения
+        max_size_mb: Максимальный размер в МБ (по умолчанию 10 МБ для Telegram фото)
+        quality: Качество JPEG (1-100, рекомендуется 85-90)
+    
+    Returns:
+        BufferedInputFile для отправки в Telegram
+    """
+    print(f"🔧 Начинаем сжатие изображения...")
+    print(f"   URL: {image_url}")
+    print(f"   Max size: {max_size_mb} MB")
+    print(f"   Quality: {quality}")
+    
+    # Скачиваем изображение
+    async with aiohttp.ClientSession() as session:
+        async with session.get(image_url) as response:
+            image_data = await response.read()
+            original_size_mb = len(image_data) / (1024 * 1024)
+            print(f"📦 Скачано: {original_size_mb:.2f} MB")
+    
+    # Открываем изображение
+    img = Image.open(BytesIO(image_data))
+    print(f"🖼️ Размер изображения: {img.size[0]}x{img.size[1]}, режим: {img.mode}")
+    
+    # Конвертируем в RGB если нужно (для JPEG)
+    if img.mode in ('RGBA', 'P', 'LA'):
+        print(f"🔄 Конвертируем {img.mode} → RGB")
+        # Создаем белый фон для прозрачности
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+        img = background
+    
+    # Сжимаем до нужного размера
+    output = BytesIO()
+    current_quality = quality
+    
+    while current_quality > 20:  # Не опускаемся ниже 20%
+        output.seek(0)
+        output.truncate()
+        
+        img.save(output, format='JPEG', quality=current_quality, optimize=True)
+        size_mb = output.tell() / (1024 * 1024)
+        
+        print(f"   Попытка quality={current_quality}: {size_mb:.2f} MB")
+        
+        if size_mb <= max_size_mb:
+            print(f"✅ Сжатие завершено: {original_size_mb:.2f} MB → {size_mb:.2f} MB (качество {current_quality})")
+            break
+        
+        current_quality -= 5
+    
+    output.seek(0)
+    return BufferedInputFile(output.read(), filename="image.jpg")
 
 
 @router.callback_query(F.data == "image_editing")
@@ -132,9 +196,6 @@ async def edit_quality_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# Словарь для хранения фото из медиа-групп
-media_group_photos = {}
-
 @router.message(ImageEditingStates.waiting_for_photos, F.photo)
 async def process_edit_photos(message: Message, state: FSMContext, bot: Bot):
     """Обработчик получения фотографий для редактирования"""
@@ -195,7 +256,6 @@ async def process_edit_photos(message: Message, state: FSMContext, bot: Bot):
             "📝 Опишите, какие изменения хотите внести в изображение"
         )
         await state.set_state(ImageEditingStates.waiting_for_description)
-
 
 
 @router.message(ImageEditingStates.waiting_for_description, F.text)
@@ -303,43 +363,25 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                     print(f"📤 ОТПРАВКА ИЗОБРАЖЕНИЯ В TELEGRAM")
                     print(f"Chat ID: {message.chat.id}")
                     print(f"Image URL: {image_url}")
-                    print(f"Image URL length: {len(image_url)}")
                     print(f"{'='*70}\n")
                     
-                    print(f"1️⃣ Создаём URLInputFile...")
-                    image_file = URLInputFile(image_url)
-                    print(f"✅ URLInputFile создан успешно")
-                    print(f"   Type: {type(image_file)}")
+                    # Сжимаем изображение
+                    compressed_image = await compress_image(image_url, max_size_mb=9.5, quality=85)
                     
-                    print(f"2️⃣ Пытаемся отправить как фото...")
-                    try:
-                        sent_message = await bot.send_photo(
-                            chat_id=message.chat.id,
-                            photo=image_file,
-                            caption="✨ Ваше изображение готово!",
-                            request_timeout=180
-                        )
-                        print(f"✅ Фото успешно отправлено! Message ID: {sent_message.message_id}")
-                    except Exception as photo_error:
-                        # Если файл слишком большой для фото, отправляем как документ
-                        if "too big for a photo" in str(photo_error):
-                            print(f"⚠️ Файл слишком большой для фото, отправляем как документ...")
-                            image_file = URLInputFile(image_url)  # Создаём заново
-                            sent_message = await bot.send_document(
-                                chat_id=message.chat.id,
-                                document=image_file,
-                                caption="✨ Ваше изображение готово!",
-                                request_timeout=180
-                            )
-                            print(f"✅ Документ успешно отправлен! Message ID: {sent_message.message_id}")
-                        else:
-                            raise photo_error
+                    print(f"📤 Отправляем сжатое изображение...")
+                    sent_message = await bot.send_photo(
+                        chat_id=message.chat.id,
+                        photo=compressed_image,
+                        caption="✨ Ваше изображение готово!",
+                        request_timeout=180
+                    )
+                    print(f"✅ Фото успешно отправлено! Message ID: {sent_message.message_id}")
                     
-                    print(f"3️⃣ Удаляем сообщение о генерации...")
+                    print(f"🗑️ Удаляем сообщение о генерации...")
                     await processing_msg.delete()
                     print(f"✅ Сообщение удалено")
 
-                    print(f"4️⃣ Сохраняем генерацию в БД...")
+                    print(f"💾 Сохраняем генерацию в БД...")
                     db.save_generation(message.from_user.id, "image_editing", image_url, prompt)
                     print(f"✅ Генерация сохранена в БД")
                     
