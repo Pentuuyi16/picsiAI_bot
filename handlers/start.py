@@ -132,11 +132,21 @@ async def menu_command_handler(message: Message):
 @router.message(Command("pay"))
 async def pay_command_handler(message: Message):
     """Обработчик команды /pay"""
-    from keyboards.inline import get_balance_amounts_keyboard
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="80₽", callback_data="amount_80"),
+                InlineKeyboardButton(text="160₽", callback_data="amount_160"),
+                InlineKeyboardButton(text="320₽", callback_data="amount_320"),
+                InlineKeyboardButton(text="640₽", callback_data="amount_640")
+            ],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
     
     await message.answer(
         "💰 Выберите сумму для пополнения:",
-        reply_markup=get_balance_amounts_keyboard(back_to="main_menu")
+        reply_markup=keyboard
     )
 
 
