@@ -311,14 +311,29 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                     print(f"✅ URLInputFile создан успешно")
                     print(f"   Type: {type(image_file)}")
                     
-                    print(f"2️⃣ Отправляем фото в Telegram...")
-                    sent_message = await bot.send_photo(
-                        chat_id=message.chat.id,
-                        photo=image_file,
-                        caption="✨ Ваше изображение готово!",
-                        request_timeout=180
-                    )
-                    print(f"✅ Фото успешно отправлено! Message ID: {sent_message.message_id}")
+                    print(f"2️⃣ Пытаемся отправить как фото...")
+                    try:
+                        sent_message = await bot.send_photo(
+                            chat_id=message.chat.id,
+                            photo=image_file,
+                            caption="✨ Ваше изображение готово!",
+                            request_timeout=180
+                        )
+                        print(f"✅ Фото успешно отправлено! Message ID: {sent_message.message_id}")
+                    except Exception as photo_error:
+                        # Если файл слишком большой для фото, отправляем как документ
+                        if "too big for a photo" in str(photo_error):
+                            print(f"⚠️ Файл слишком большой для фото, отправляем как документ...")
+                            image_file = URLInputFile(image_url)  # Создаём заново
+                            sent_message = await bot.send_document(
+                                chat_id=message.chat.id,
+                                document=image_file,
+                                caption="✨ Ваше изображение готово!",
+                                request_timeout=180
+                            )
+                            print(f"✅ Документ успешно отправлен! Message ID: {sent_message.message_id}")
+                        else:
+                            raise photo_error
                     
                     print(f"3️⃣ Удаляем сообщение о генерации...")
                     await processing_msg.delete()
