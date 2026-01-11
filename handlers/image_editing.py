@@ -299,20 +299,49 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                 
                 # Отправляем изображение
                 try:
+                    print(f"\n{'='*70}")
+                    print(f"📤 ОТПРАВКА ИЗОБРАЖЕНИЯ В TELEGRAM")
+                    print(f"Chat ID: {message.chat.id}")
+                    print(f"Image URL: {image_url}")
+                    print(f"Image URL length: {len(image_url)}")
+                    print(f"{'='*70}\n")
+                    
+                    print(f"1️⃣ Создаём URLInputFile...")
                     image_file = URLInputFile(image_url)
-                    await bot.send_photo(
+                    print(f"✅ URLInputFile создан успешно")
+                    print(f"   Type: {type(image_file)}")
+                    
+                    print(f"2️⃣ Отправляем фото в Telegram...")
+                    sent_message = await bot.send_photo(
                         chat_id=message.chat.id,
                         photo=image_file,
                         caption="✨ Ваше изображение готово!",
                         request_timeout=180
                     )
+                    print(f"✅ Фото успешно отправлено! Message ID: {sent_message.message_id}")
                     
-                    # Удаляем сообщение о генерации ТОЛЬКО после успешной отправки
+                    print(f"3️⃣ Удаляем сообщение о генерации...")
                     await processing_msg.delete()
+                    print(f"✅ Сообщение удалено")
 
-                    # Сохраняем генерацию в БД
+                    print(f"4️⃣ Сохраняем генерацию в БД...")
                     db.save_generation(message.from_user.id, "image_editing", image_url, prompt)
+                    print(f"✅ Генерация сохранена в БД")
+                    
+                    print(f"\n{'='*70}")
+                    print(f"🎉 РЕДАКТИРОВАНИЕ ЗАВЕРШЕНО УСПЕШНО")
+                    print(f"{'='*70}\n")
+                    
                 except Exception as e:
+                    print(f"\n{'='*70}")
+                    print(f"❌ ОШИБКА ПРИ ОТПРАВКЕ ИЗОБРАЖЕНИЯ")
+                    print(f"Тип ошибки: {type(e).__name__}")
+                    print(f"Текст ошибки: {str(e)}")
+                    print(f"Traceback:")
+                    import traceback
+                    traceback.print_exc()
+                    print(f"{'='*70}\n")
+                    
                     await processing_msg.edit_text(
                         "❌ Не удалось отправить изображение. Попробуйте позже."
                     )
