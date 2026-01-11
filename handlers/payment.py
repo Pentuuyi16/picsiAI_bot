@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from keyboards.inline import (
     get_balance_amounts_keyboard, 
@@ -13,6 +13,9 @@ from keyboards.inline import (
     get_main_menu_keyboard,
     get_cabinet_keyboard
 )
+import aiohttp
+from PIL import Image
+from io import BytesIO
 
 router = Router()
 
@@ -21,6 +24,65 @@ EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIBIGlW5FgkfH7gptZL7Da37J-Ysa9xAAJRjwACUHW
 
 # Словарь для хранения информации о том, откуда пользователь пришёл на пополнение
 user_balance_context = {}
+
+
+async def compress_image(image_url: str, max_size_mb: float = 9.0, quality: int = 85) -> BufferedInputFile:
+    """
+    Скачивает и сжимает изображение для отправки в Telegram
+    
+    Args:
+        image_url: URL изображения
+        max_size_mb: Максимальный размер в МБ
+        quality: Качество JPEG (1-100)
+    
+    Returns:
+        BufferedInputFile для отправки в Telegram
+    """
+    print(f"🔧 Начинаем сжатие изображения...")
+    print(f"   URL: {image_url}")
+    print(f"   Max size: {max_size_mb} MB")
+    
+    # Скачиваем изображение
+    async with aiohttp.ClientSession() as session:
+        async with session.get(image_url) as response:
+            image_data = await response.read()
+            original_size_mb = len(image_data) / (1024 * 1024)
+            print(f"📦 Скачано: {original_size_mb:.2f} MB")
+    
+    # Открываем изображение
+    img = Image.open(BytesIO(image_data))
+    print(f"🖼️ Размер: {img.size[0]}x{img.size[1]}, режим: {img.mode}")
+    
+    # Конвертируем в RGB если нужно
+    if img.mode in ('RGBA', 'P', 'LA'):
+        print(f"🔄 Конвертируем {img.mode} → RGB")
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+        img = background
+    
+    # Сжимаем
+    output = BytesIO()
+    current_quality = quality
+    
+    while current_quality > 20:
+        output.seek(0)
+        output.truncate()
+        
+        img.save(output, format='JPEG', quality=current_quality, optimize=True)
+        size_mb = output.tell() / (1024 * 1024)
+        
+        print(f"   Quality={current_quality}: {size_mb:.2f} MB")
+        
+        if size_mb <= max_size_mb:
+            print(f"✅ Сжато: {original_size_mb:.2f} MB → {size_mb:.2f} MB")
+            break
+        
+        current_quality -= 5
+    
+    output.seek(0)
+    return BufferedInputFile(output.read(), filename="image.jpg")
 
 
 @router.callback_query(F.data == "top_up_balance_photo")
@@ -697,15 +759,24 @@ async def start_action_handler(callback: CallbackQuery):
                         
                         # Отправляем изображение
                         try:
-                            image_file = URLInputFile(image_url)
+                            print(f"\n{'='*70}")
+                            print(f"📤 ОТПРАВКА ИЗОБРАЖЕНИЯ")
+                            print(f"Image URL: {image_url}")
+                            print(f"{'='*70}\n")
+                            
+                            # Сжимаем изображение
+                            compressed_image = await compress_image(image_url, max_size_mb=9.0, quality=85)
+                            
+                            print(f"📤 Отправляем сжатое изображение...")
                             await callback.bot.send_photo(
                                 chat_id=callback.message.chat.id,
-                                photo=image_file,
+                                photo=compressed_image,
                                 caption="✨ Ваше изображение готово!",
                                 request_timeout=180
                             )
+                            print(f"✅ Изображение отправлено!")
+                            
                             await processing_msg.delete()
-                            print("✅ Изображение успешно отправлено")
                             
                             db.save_generation(user_id, "image_editing", image_url, prompt)
                         except Exception as e:
