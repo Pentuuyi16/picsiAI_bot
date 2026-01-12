@@ -318,7 +318,101 @@ class Database:
         """Удаляет незавершённое действие после выполнения"""
         self.cursor.execute('DELETE FROM pending_actions WHERE user_id = ?', (user_id,))
         self.conn.commit()
+    def get_total_users_count(self):
+        """Получает общее количество пользователей"""
+        self.cursor.execute("SELECT COUNT(*) FROM users")
+        count = self.cursor.fetchone()[0]
+        return count
     
+    def get_new_users_count(self, days=7):
+        """Получает количество новых пользователей за последние N дней"""
+        self.cursor.execute("""
+            SELECT COUNT(*) 
+            FROM users 
+            WHERE created_at >= datetime('now', '-' || ? || ' days')
+        """, (days,))
+        return self.cursor.fetchone()[0]
+    
+    def get_total_generations_count(self):
+        """Получает общее количество генераций"""
+        self.cursor.execute("SELECT COUNT(*) FROM generations")
+        count = self.cursor.fetchone()[0]
+        return count
+    
+    def get_generations_by_type(self):
+        """Получает количество генераций по типам"""
+        self.cursor.execute("""
+            SELECT type, COUNT(*) 
+            FROM generations 
+            GROUP BY type
+        """)
+        results = self.cursor.fetchall()
+        return {row[0]: row[1] for row in results}
+    
+    def get_total_payments_sum(self):
+        """Получает общую сумму успешных платежей"""
+        self.cursor.execute("""
+            SELECT COALESCE(SUM(amount), 0.0) 
+            FROM payments 
+            WHERE status = 'succeeded'
+        """)
+        result = self.cursor.fetchone()[0]
+        return result if result else 0.0
+    
+    def get_payments_count(self):
+        """Получает количество успешных платежей"""
+        self.cursor.execute("""
+            SELECT COUNT(*) 
+            FROM payments 
+            WHERE status = 'succeeded'
+        """)
+        return self.cursor.fetchone()[0]
+    
+    def get_recent_payments_sum(self, days=7):
+        """Получает сумму платежей за последние N дней"""
+        self.cursor.execute("""
+            SELECT COALESCE(SUM(amount), 0.0)
+            FROM payments 
+            WHERE status = 'succeeded' 
+            AND paid_at >= datetime('now', '-' || ? || ' days')
+        """, (days,))
+        result = self.cursor.fetchone()[0]
+        return result if result else 0.0
+    
+    def get_active_users_count(self, days=7):
+        """Получает количество активных пользователей (сделавших хотя бы 1 генерацию)"""
+        self.cursor.execute("""
+            SELECT COUNT(DISTINCT user_id) 
+            FROM generations 
+            WHERE created_at >= datetime('now', '-' || ? || ' days')
+        """, (days,))
+        return self.cursor.fetchone()[0]
+    
+    def get_top_users_by_generations(self, limit=10):
+        """Получает топ пользователей по количеству генераций"""
+        self.cursor.execute("""
+            SELECT u.user_id, u.username, u.first_name, COUNT(g.id) as gen_count
+            FROM users u
+            JOIN generations g ON u.user_id = g.user_id
+            GROUP BY u.user_id
+            ORDER BY gen_count DESC
+            LIMIT ?
+        """, (limit,))
+        return self.cursor.fetchall()
+    
+    def get_referral_stats_total(self):
+        """Получает общую статистику по рефералам"""
+        self.cursor.execute("SELECT COUNT(*) FROM users WHERE referrer_id IS NOT NULL")
+        total_referrals = self.cursor.fetchone()[0]
+        
+        self.cursor.execute("SELECT COALESCE(SUM(amount), 0.0) FROM referral_earnings")
+        total_referral_earnings = self.cursor.fetchone()[0]
+        
+        return {
+            'total_referrals': total_referrals,
+            'total_earnings': total_referral_earnings
+        }
+
     def __del__(self):
         """Закрывает соединение при удалении объекта"""
         if hasattr(self, 'conn'):

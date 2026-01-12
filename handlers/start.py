@@ -199,3 +199,58 @@ async def help_command_handler(message: Message):
         parse_mode="HTML",
         reply_markup=keyboard
     )
+
+@router.message(Command("stats"))
+async def stats_command_handler(message: Message):
+    """Обработчик команды /stats - статистика бота (только для админов)"""
+    from database.database import Database
+    
+    # Список ID администраторов (замени на свой)
+    ADMIN_IDS = [6397535545]  # Твой user_id
+    
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("❌ У вас нет доступа к статистике")
+        return
+    
+    db = Database()
+    
+    # Собираем статистику
+    total_users = db.get_total_users_count()
+    new_users_7d = db.get_new_users_count(days=7)
+    active_users_7d = db.get_active_users_count(days=7)
+    
+    total_generations = db.get_total_generations_count()
+    generations_by_type = db.get_generations_by_type()
+    
+    total_payments = db.get_payments_count()
+    total_earnings = db.get_total_payments_sum()
+    earnings_7d = db.get_recent_payments_sum(days=7)
+    
+    referral_stats = db.get_referral_stats_total()
+    
+    # Генерации по типам
+    photo_count = generations_by_type.get('photo_animation', 0)
+    video_count = generations_by_type.get('video_generation', 0)
+    edit_count = generations_by_type.get('image_editing', 0)
+    
+    text = (
+        "<b>📊 Статистика бота</b>\n\n"
+        "<b>👥 Пользователи:</b>\n"
+        f"  • Всего: <b>{total_users}</b>\n"
+        f"  • Новых за 7 дней: <b>{new_users_7d}</b>\n"
+        f"  • Активных за 7 дней: <b>{active_users_7d}</b>\n\n"
+        "<b>🎨 Генерации:</b>\n"
+        f"  • Всего: <b>{total_generations}</b>\n"
+        f"  • Оживление фото: <b>{photo_count}</b>\n"
+        f"  • Генерация видео: <b>{video_count}</b>\n"
+        f"  • Редактирование: <b>{edit_count}</b>\n\n"
+        "<b>💰 Платежи:</b>\n"
+        f"  • Всего платежей: <b>{total_payments}</b>\n"
+        f"  • Всего заработано: <b>{total_earnings:.2f} ₽</b>\n"
+        f"  • За 7 дней: <b>{earnings_7d:.2f} ₽</b>\n\n"
+        "<b>🔗 Рефералы:</b>\n"
+        f"  • Всего приглашено: <b>{referral_stats['total_referrals']}</b>\n"
+        f"  • Выплачено рефералам: <b>{referral_stats['total_earnings']:.2f} ₽</b>"
+    )
+    
+    await message.answer(text, parse_mode="HTML")
