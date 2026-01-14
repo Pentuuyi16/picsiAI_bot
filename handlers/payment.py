@@ -244,7 +244,7 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
         "3️⃣ <b><i>Подождите всего пару минут</i></b> — и получите изображение с качественным редактированием.\n\n"
         "Ваши <b><i>фото</i></b> могут выглядеть ещё лучше 💫\n\n"
         f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"🎨 Редактирование 1 изображения = 25₽</blockquote>"
+        f"🎨 Редактирование 1 изображения = 15₽</blockquote>"
     )
     
     # Удаляем старое сообщение
@@ -716,7 +716,7 @@ async def start_action_handler(callback: CallbackQuery):
         resolution = state_data.get("edit_quality", "1K")
         photos = state_data.get("edit_photos", [])
         
-        required_amount = 25.00
+        required_amount = 15.00
         
         if balance < required_amount:
             await callback.message.answer("❌ Недостаточно средств для редактирования изображения")
