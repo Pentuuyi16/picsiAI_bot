@@ -105,7 +105,7 @@ class MotionControlClient:
             # Загружаем на file.io
             logger.info(f"📤 Загружаем на file.io...")
             
-            upload_url = "https://file.io"
+            upload_url = "https://0x0.st"
             
             form_data = aiohttp.FormData()
             form_data.add_field(
@@ -125,16 +125,15 @@ class MotionControlClient:
                         logger.error(f"Response: {response_text}")
                         return video_url
                     
-                    result = await response.json()
-                    logger.info(f"file.io result: {result}")
+                    public_url = await response.text()
+                    public_url = public_url.strip()
+                    logger.info(f"file.io result: {public_url}")
                     
-                    if result.get('success'):
-                        public_url = result.get('link')
-                        if public_url:
-                            logger.info(f"✅ Видео загружено на file.io: {public_url}")
-                            return public_url
+                    if public_url.startswith('http'):
+                        logger.info(f"✅ Видео загружено на 0x0.st: {public_url}")
+                        return public_url
                     
-                    logger.warning(f"Не удалось получить URL с file.io: {result}")
+                    logger.warning(f"Не удалось получить URL с file.io: {public_url}")
                     return video_url
         
         except subprocess.TimeoutExpired:
@@ -172,7 +171,7 @@ class MotionControlClient:
             
             logger.info(f"📤 Загружаем изображение на file.io...")
             
-            upload_url = "https://file.io"
+            upload_url = "https://0x0.st"
             
             form_data = aiohttp.FormData()
             form_data.add_field(
@@ -188,17 +187,17 @@ class MotionControlClient:
                         logger.error(f"Ошибка загрузки изображения на file.io: HTTP {response.status}")
                         return image_url
                     
-                    result = await response.json()
-                    logger.info(f"file.io image result: {result}")
+                    public_url = await response.text()
+                    public_url = public_url.strip()
+                    logger.info(f"file.io result: {public_url}")
                     
-                    if result.get('success'):
-                        public_url = result.get('link')
-                        if public_url:
-                            logger.info(f"✅ Изображение загружено: {public_url}")
-                            return public_url
+                    if public_url.startswith('http'):
+                        logger.info(f"✅ Видео загружено на 0x0.st: {public_url}")
+                        return public_url
                     
-                    logger.warning(f"Не удалось получить URL изображения с file.io")
-                    return image_url
+                    logger.warning(f"Не удалось получить URL с file.io: {public_url}")
+                    return video_url
+                    
         
         except Exception as e:
             logger.error(f"❌ Ошибка загрузки изображения: {e}", exc_info=True)
