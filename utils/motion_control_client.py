@@ -14,6 +14,74 @@ class MotionControlClient:
         self.base_url = "https://api.kie.ai/api/v1/jobs"
         self.model = "kling-2.6/motion-control"
     
+    async def upload_to_telegraph(self, file_url: str, file_name: str = "file") -> str:
+        """
+        Скачивает файл из Telegram и загружает на telegra.ph
+        
+        Args:
+            file_url: URL файла из Telegram
+            file_name: Имя файла
+        
+        Returns:
+            Публичный URL файла на telegra.ph
+        """
+        try:
+            logger.info(f"📥 Скачиваем файл из Telegram: {file_url}")
+            
+            # Скачиваем файл из Telegram
+            async with aiohttp.ClientSession() as session:
+                async with session.get(file_url) as response:
+                    if response.status != 200:
+                        logger.error(f"Ошибка скачивания: HTTP {response.status}")
+                        return file_url
+                    
+                    file_data = await response.read()
+                    file_size_mb = len(file_data) / (1024 * 1024)
+                    logger.info(f"✅ Файл скачан: {file_size_mb:.2f} MB")
+            
+            # Загружаем на telegra.ph
+            logger.info(f"📤 Загружаем на telegra.ph...")
+            
+            upload_url = "https://telegra.ph/upload"
+            
+            form_data = aiohttp.FormData()
+            # Определяем content type по расширению
+            content_type = "video/mp4"  # По умолчанию
+            if file_name.lower().endswith('.mov'):
+                content_type = "video/quicktime"
+            elif file_name.lower().endswith('.jpg') or file_name.lower().endswith('.jpeg'):
+                content_type = "image/jpeg"
+            elif file_name.lower().endswith('.png'):
+                content_type = "image/png"
+            
+            form_data.add_field('file',
+                              file_data,
+                              filename=file_name,
+                              content_type=content_type)
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(upload_url, data=form_data) as response:
+                    if response.status != 200:
+                        logger.error(f"Ошибка загрузки на telegraph: HTTP {response.status}")
+                        return file_url
+                    
+                    result = await response.json()
+                    
+                    if isinstance(result, list) and len(result) > 0:
+                        # telegra.ph возвращает массив с путями
+                        file_path = result[0].get('src', '')
+                        if file_path:
+                            public_url = f"https://telegra.ph{file_path}"
+                            logger.info(f"✅ Файл загружен на telegra.ph: {public_url}")
+                            return public_url
+                    
+                    logger.warning(f"Не удалось получить URL с telegra.ph: {result}")
+                    return file_url
+        
+        except Exception as e:
+            logger.error(f"❌ Ошибка при загрузке на telegra.ph: {e}", exc_info=True)
+            return file_url
+    
     async def create_task(self, image_url: str, video_url: str, prompt: str = "", 
                           character_orientation: str = "video", mode: str = "720p"):
         """
@@ -36,11 +104,24 @@ class MotionControlClient:
             "Authorization": f"Bearer {self.api_key}"
         }
         
+        # ИСПРАВЛЕНИЕ: Загружаем файлы на публичный хостинг
+        logger.info(f"📤 Загружаем файлы на публичный хостинг (telegra.ph)...")
+        
+        # Определяем имена файлов из URL
+        image_filename = image_url.split('/')[-1] if '/' in image_url else 'image.jpg'
+        video_filename = video_url.split('/')[-1] if '/' in video_url else 'video.mov'
+        
+        public_image_url = await self.upload_to_telegraph(image_url, image_filename)
+        public_video_url = await self.upload_to_telegraph(video_url, video_filename)
+        
+        logger.info(f"🔗 Public Image URL: {public_image_url}")
+        logger.info(f"🔗 Public Video URL: {public_video_url}")
+        
         payload = {
             "model": self.model,
             "input": {
-                "input_urls": [image_url],
-                "video_urls": [video_url],
+                "input_urls": [public_image_url],
+                "video_urls": [public_video_url],
                 "character_orientation": character_orientation,
                 "mode": mode
             }
@@ -53,8 +134,10 @@ class MotionControlClient:
         try:
             logger.info(f"="*70)
             logger.info(f"🎯 СОЗДАНИЕ ЗАДАЧИ MOTION CONTROL")
-            logger.info(f"Image URL: {image_url}")
-            logger.info(f"Video URL: {video_url}")
+            logger.info(f"Image URL (original): {image_url}")
+            logger.info(f"Image URL (public): {public_image_url}")
+            logger.info(f"Video URL (original): {video_url}")
+            logger.info(f"Video URL (public): {public_video_url}")
             logger.info(f"Orientation: {character_orientation}")
             logger.info(f"Mode: {mode}")
             logger.info(f"Prompt: {prompt[:100] if prompt else 'None'}")
