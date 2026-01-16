@@ -19,7 +19,7 @@ class MotionControlClient:
     
     async def convert_and_upload_video(self, video_url: str) -> str:
         """
-        Скачивает видео, конвертирует в mp4 (если нужно) и загружает на telegra.ph
+        Скачивает видео, конвертирует в mp4 и загружает на file.io
         
         Args:
             video_url: URL видео из Telegram
@@ -63,17 +63,17 @@ class MotionControlClient:
             ffmpeg_cmd = [
                 'ffmpeg',
                 '-i', temp_input.name,
-                '-c:v', 'libx264',           # H.264 кодек
-                '-preset', 'fast',            # Быстрая конвертация
-                '-crf', '23',                 # Качество (18-28, меньше=лучше)
-                '-c:a', 'aac',                # AAC аудио
-                '-b:a', '128k',               # Битрейт аудио
-                '-movflags', '+faststart',    # Для стриминга
-                '-y',                         # Перезаписать файл
+                '-c:v', 'libx264',
+                '-preset', 'fast',
+                '-crf', '23',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-movflags', '+faststart',
+                '-y',
                 temp_output.name
             ]
             
-            logger.info(f"🎬 Запускаем FFmpeg: {' '.join(ffmpeg_cmd)}")
+            logger.info(f"🎬 Запускаем FFmpeg...")
             
             result = subprocess.run(
                 ffmpeg_cmd,
@@ -83,16 +83,14 @@ class MotionControlClient:
             )
             
             if result.returncode != 0:
-                logger.error(f"❌ FFmpeg error (code {result.returncode}):")
-                logger.error(f"STDERR: {result.stderr.decode()}")
-                logger.error(f"STDOUT: {result.stdout.decode()}")
+                logger.error(f"❌ FFmpeg error (code {result.returncode})")
                 return video_url
             
             logger.info(f"✅ Видео конвертировано в MP4")
             
             # Проверяем что файл создан
             if not os.path.exists(temp_output.name):
-                logger.error(f"❌ Выходной файл не создан: {temp_output.name}")
+                logger.error(f"❌ Выходной файл не создан")
                 return video_url
             
             output_size = os.path.getsize(temp_output.name)
@@ -104,10 +102,10 @@ class MotionControlClient:
                 converted_size_mb = len(converted_video_data) / (1024 * 1024)
                 logger.info(f"✅ Видео прочитано: {converted_size_mb:.2f} MB")
             
-            # Загружаем на telegra.ph
-            logger.info(f"📤 Загружаем на telegra.ph...")
+            # Загружаем на file.io
+            logger.info(f"📤 Загружаем на file.io...")
             
-            upload_url = "https://telegra.ph/upload"
+            upload_url = "https://file.io"
             
             form_data = aiohttp.FormData()
             form_data.add_field(
@@ -119,25 +117,24 @@ class MotionControlClient:
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(upload_url, data=form_data, timeout=120) as response:
-                    logger.info(f"Telegraph response status: {response.status}")
+                    logger.info(f"file.io response status: {response.status}")
                     
                     if response.status != 200:
                         response_text = await response.text()
-                        logger.error(f"Ошибка загрузки на telegraph: HTTP {response.status}")
+                        logger.error(f"Ошибка загрузки на file.io: HTTP {response.status}")
                         logger.error(f"Response: {response_text}")
                         return video_url
                     
                     result = await response.json()
-                    logger.info(f"Telegraph result: {result}")
+                    logger.info(f"file.io result: {result}")
                     
-                    if isinstance(result, list) and len(result) > 0:
-                        file_path = result[0].get('src', '')
-                        if file_path:
-                            public_url = f"https://telegra.ph{file_path}"
-                            logger.info(f"✅ Видео загружено на telegra.ph: {public_url}")
+                    if result.get('success'):
+                        public_url = result.get('link')
+                        if public_url:
+                            logger.info(f"✅ Видео загружено на file.io: {public_url}")
                             return public_url
                     
-                    logger.warning(f"Не удалось получить URL с telegra.ph: {result}")
+                    logger.warning(f"Не удалось получить URL с file.io: {result}")
                     return video_url
         
         except subprocess.TimeoutExpired:
@@ -152,15 +149,15 @@ class MotionControlClient:
             try:
                 if temp_input and os.path.exists(temp_input.name):
                     os.unlink(temp_input.name)
-                    logger.info(f"🗑️ Удален temp input: {temp_input.name}")
+                    logger.info(f"🗑️ Удален temp input")
                 if temp_output and os.path.exists(temp_output.name):
                     os.unlink(temp_output.name)
-                    logger.info(f"🗑️ Удален temp output: {temp_output.name}")
+                    logger.info(f"🗑️ Удален temp output")
             except Exception as e:
                 logger.error(f"Ошибка удаления временных файлов: {e}")
     
-    async def upload_image_to_telegraph(self, image_url: str) -> str:
-        """Загружает изображение на telegra.ph"""
+    async def upload_image_to_fileio(self, image_url: str) -> str:
+        """Загружает изображение на file.io"""
         try:
             logger.info(f"📥 Скачиваем изображение: {image_url}")
             
@@ -173,9 +170,9 @@ class MotionControlClient:
                     image_data = await response.read()
                     logger.info(f"✅ Изображение скачано: {len(image_data) / 1024:.2f} KB")
             
-            logger.info(f"📤 Загружаем изображение на telegra.ph...")
+            logger.info(f"📤 Загружаем изображение на file.io...")
             
-            upload_url = "https://telegra.ph/upload"
+            upload_url = "https://file.io"
             
             form_data = aiohttp.FormData()
             form_data.add_field(
@@ -188,20 +185,19 @@ class MotionControlClient:
             async with aiohttp.ClientSession() as session:
                 async with session.post(upload_url, data=form_data, timeout=30) as response:
                     if response.status != 200:
-                        logger.error(f"Ошибка загрузки изображения на telegraph: HTTP {response.status}")
+                        logger.error(f"Ошибка загрузки изображения на file.io: HTTP {response.status}")
                         return image_url
                     
                     result = await response.json()
-                    logger.info(f"Telegraph image result: {result}")
+                    logger.info(f"file.io image result: {result}")
                     
-                    if isinstance(result, list) and len(result) > 0:
-                        file_path = result[0].get('src', '')
-                        if file_path:
-                            public_url = f"https://telegra.ph{file_path}"
+                    if result.get('success'):
+                        public_url = result.get('link')
+                        if public_url:
                             logger.info(f"✅ Изображение загружено: {public_url}")
                             return public_url
                     
-                    logger.warning(f"Не удалось получить URL изображения с telegra.ph")
+                    logger.warning(f"Не удалось получить URL изображения с file.io")
                     return image_url
         
         except Exception as e:
@@ -223,7 +219,7 @@ class MotionControlClient:
         logger.info(f"Original Video URL: {video_url}")
         
         # Загружаем изображение
-        public_image_url = await self.upload_image_to_telegraph(image_url)
+        public_image_url = await self.upload_image_to_fileio(image_url)
         
         # Конвертируем и загружаем видео
         public_video_url = await self.convert_and_upload_video(video_url)
