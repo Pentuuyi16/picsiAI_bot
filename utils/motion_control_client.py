@@ -51,55 +51,49 @@ class MotionControlClient:
             payload["input"]["prompt"] = prompt[:2500]  # Максимум 2500 символов
         
         try:
-            print(f"\n{'='*70}")
-            print(f"🎯 СОЗДАНИЕ ЗАДАЧИ MOTION CONTROL")
-            print(f"Image URL: {image_url}")
-            print(f"Video URL: {video_url}")
-            print(f"Orientation: {character_orientation}")
-            print(f"Mode: {mode}")
-            print(f"Prompt: {prompt[:100] if prompt else 'None'}")
-            print(f"\n📦 Full Payload:")
-            print(json.dumps(payload, indent=2, ensure_ascii=False))
-            print(f"{'='*70}\n")
+            logger.info(f"="*70)
+            logger.info(f"🎯 СОЗДАНИЕ ЗАДАЧИ MOTION CONTROL")
+            logger.info(f"Image URL: {image_url}")
+            logger.info(f"Video URL: {video_url}")
+            logger.info(f"Orientation: {character_orientation}")
+            logger.info(f"Mode: {mode}")
+            logger.info(f"Prompt: {prompt[:100] if prompt else 'None'}")
+            logger.info(f"Full Payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+            logger.info(f"="*70)
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=payload, timeout=30) as response:
-                    # ДОБАВЛЕНО: Читаем raw response
+                    # Читаем raw response
                     response_text = await response.text()
-                    print(f"\n📥 RAW API RESPONSE:")
-                    print(f"Status Code: {response.status}")
-                    print(f"Response Body: {response_text}")
-                    print(f"{'='*50}\n")
+                    
+                    logger.info(f"📥 RAW API RESPONSE:")
+                    logger.info(f"Status Code: {response.status}")
+                    logger.info(f"Response Body: {response_text}")
                     
                     # Пытаемся распарсить JSON
                     try:
                         result = json.loads(response_text)
                     except json.JSONDecodeError as e:
-                        print(f"❌ Ошибка парсинга JSON: {e}")
-                        print(f"Response text: {response_text}")
+                        logger.error(f"❌ Ошибка парсинга JSON: {e}")
+                        logger.error(f"Response text: {response_text}")
                         return None
                     
-                    print(f"📊 PARSED API Response:")
-                    print(f"   Code: {result.get('code')}")
-                    print(f"   Message: {result.get('message')}")
-                    print(f"   Data: {result.get('data')}")
+                    logger.info(f"📊 PARSED API Response:")
+                    logger.info(f"Code: {result.get('code')}")
+                    logger.info(f"Message: {result.get('message')}")
+                    logger.info(f"Data: {result.get('data')}")
                     
                     if result.get("code") == 200 and result.get("data", {}).get("taskId"):
                         task_id = result["data"]["taskId"]
-                        print(f"\n✅ Task ID создан: {task_id}\n")
+                        logger.info(f"✅ Task ID создан: {task_id}")
                         return task_id
                     else:
-                        print(f"\n❌ Ошибка создания задачи!")
-                        print(f"Full API Response:")
-                        print(json.dumps(result, indent=2, ensure_ascii=False))
-                        print()
+                        logger.error(f"❌ Ошибка создания задачи!")
+                        logger.error(f"Full API Response: {json.dumps(result, indent=2, ensure_ascii=False)}")
                         return None
         
         except Exception as e:
-            logger.error(f"Ошибка при создании задачи: {e}", exc_info=True)
-            print(f"❌ Exception: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"❌ Exception при создании задачи: {e}", exc_info=True)
             return None
     
     async def get_task_status(self, task_id: str):
@@ -149,23 +143,23 @@ class MotionControlClient:
         Returns:
             video_url если успешно, "MODERATION_ERROR" при ошибке модерации, None при других ошибках
         """
-        print(f"\n{'='*70}")
-        print(f"⏳ ОЖИДАНИЕ ЗАВЕРШЕНИЯ ГЕНЕРАЦИИ")
-        print(f"Task ID: {task_id}")
-        print(f"Max attempts: {max_attempts} (макс. {max_attempts * delay // 60} минут)")
-        print(f"{'='*70}\n")
+        logger.info(f"="*70)
+        logger.info(f"⏳ ОЖИДАНИЕ ЗАВЕРШЕНИЯ ГЕНЕРАЦИИ")
+        logger.info(f"Task ID: {task_id}")
+        logger.info(f"Max attempts: {max_attempts} (макс. {max_attempts * delay // 60} минут)")
+        logger.info(f"="*70)
         
         for attempt in range(max_attempts):
             try:
                 data = await self.get_task_status(task_id)
                 
                 if not data:
-                    print(f"⚠️ Попытка {attempt + 1}/{max_attempts}: Не удалось получить статус")
+                    logger.warning(f"Попытка {attempt + 1}/{max_attempts}: Не удалось получить статус")
                     await asyncio.sleep(delay)
                     continue
                 
                 state = data.get("state")
-                print(f"🔄 Попытка {attempt + 1}/{max_attempts}: State = {state}")
+                logger.info(f"🔄 Попытка {attempt + 1}/{max_attempts}: State = {state}")
                 
                 if state == "success":
                     # Парсим результат
@@ -177,27 +171,27 @@ class MotionControlClient:
                             
                             if video_urls:
                                 video_url = video_urls[0]
-                                print(f"\n{'='*70}")
-                                print(f"✅ ГЕНЕРАЦИЯ ЗАВЕРШЕНА УСПЕШНО")
-                                print(f"Video URL: {video_url}")
-                                print(f"Время генерации: {data.get('costTime', 0) // 1000} сек")
-                                print(f"{'='*70}\n")
+                                logger.info(f"="*70)
+                                logger.info(f"✅ ГЕНЕРАЦИЯ ЗАВЕРШЕНА УСПЕШНО")
+                                logger.info(f"Video URL: {video_url}")
+                                logger.info(f"Время генерации: {data.get('costTime', 0) // 1000} сек")
+                                logger.info(f"="*70)
                                 return video_url
                         except json.JSONDecodeError as e:
                             logger.error(f"Ошибка парсинга resultJson: {e}")
                     
-                    print("⚠️ Задача завершена, но нет URL видео")
+                    logger.warning("Задача завершена, но нет URL видео")
                     return None
                 
                 elif state == "fail":
                     fail_code = data.get("failCode", "")
                     fail_msg = data.get("failMsg", "")
                     
-                    print(f"\n{'='*70}")
-                    print(f"❌ ГЕНЕРАЦИЯ ПРОВАЛИЛАСЬ")
-                    print(f"Fail Code: {fail_code}")
-                    print(f"Fail Message: {fail_msg}")
-                    print(f"{'='*70}\n")
+                    logger.error(f"="*70)
+                    logger.error(f"❌ ГЕНЕРАЦИЯ ПРОВАЛИЛАСЬ")
+                    logger.error(f"Fail Code: {fail_code}")
+                    logger.error(f"Fail Message: {fail_msg}")
+                    logger.error(f"="*70)
                     
                     # Проверяем на ошибку модерации
                     if "moderation" in fail_msg.lower() or fail_code in ["403", "451"]:
@@ -211,7 +205,7 @@ class MotionControlClient:
                     continue
                 
                 else:
-                    print(f"⚠️ Неизвестный статус: {state}")
+                    logger.warning(f"Неизвестный статус: {state}")
                     await asyncio.sleep(delay)
                     continue
             
@@ -220,8 +214,8 @@ class MotionControlClient:
                 await asyncio.sleep(delay)
                 continue
         
-        print(f"\n{'='*70}")
-        print(f"⏱️ ПРЕВЫШЕНО ВРЕМЯ ОЖИДАНИЯ")
-        print(f"Задача не завершилась за {max_attempts * delay // 60} минут")
-        print(f"{'='*70}\n")
+        logger.error(f"="*70)
+        logger.error(f"⏱️ ПРЕВЫШЕНО ВРЕМЯ ОЖИДАНИЯ")
+        logger.error(f"Задача не завершилась за {max_attempts * delay // 60} минут")
+        logger.error(f"="*70)
         return None
