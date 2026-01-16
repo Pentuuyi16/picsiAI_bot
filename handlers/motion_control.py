@@ -170,8 +170,27 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     video_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
     video_duration = video.duration
     
+    # ДОБАВЛЕНО: Проверка разрешения видео
+    video_width = video.width
+    video_height = video.height
+    
     logger.info(f"Video URL: {video_url}")
     logger.info(f"Video duration: {video_duration} seconds")
+    logger.info(f"Video resolution: {video_width}x{video_height}")
+    
+    # Проверяем минимальное разрешение
+    if video_width < 720 or video_height < 720:
+        logger.warning(f"Video resolution too low: {video_width}x{video_height}")
+        await message.answer(
+            f"❌ Разрешение видео слишком низкое!\n\n"
+            f"<b>Минимальные требования:</b>\n"
+            f"• Ширина: минимум 720 пикселей\n"
+            f"• Высота: минимум 720 пикселей\n\n"
+            f"<b>Ваше видео:</b> {video_width}x{video_height}\n\n"
+            f"💡 Загрузите видео с более высоким разрешением",
+            parse_mode="HTML"
+        )
+        return
     
     # Сохраняем URL видео
     await state.update_data(motion_video=video_url, video_duration=video_duration)
