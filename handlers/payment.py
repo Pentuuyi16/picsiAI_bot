@@ -854,29 +854,29 @@ async def start_action_handler(callback: CallbackQuery):
                 await callback.message.answer("❌ Произошла ошибка при редактировании.")
     
     elif action_type == "motion_control_pending":
-        # Управление движением
+    # Управление движением
         state_data = action_data.get("state_data", {})
-        
+    
         quality = state_data.get("motion_quality", "720p")
         photo_url = state_data.get("motion_photo")
         video_url = state_data.get("motion_video")
         video_duration = state_data.get("video_duration", 5)
-        
+    
         # Рассчитываем стоимость
         price_per_second = 5.00 if quality == "720p" else 7.00
         required_amount = price_per_second * video_duration
-        
+    
         if balance < required_amount:
             await callback.message.answer("❌ Недостаточно средств для генерации видео")
             return
-        
+    
         processing_msg = await callback.message.answer(
             "⭐ Начинается генерация, пожалуйста подождите 5-10 минут, так как процесс довольно трудоемкий"
         )
-        
+    
         try:
             motion_client = MotionControlClient()
-            
+        
             task_id = await motion_client.create_task(
                 image_url=photo_url,
                 video_url=video_url,
@@ -884,10 +884,10 @@ async def start_action_handler(callback: CallbackQuery):
                 character_orientation="video",
                 mode=quality
             )
-            
+        
             if task_id:
                 result_url = await motion_client.wait_for_result(task_id, max_attempts=120, delay=10)
-                
+            
                 if result_url:
                     if result_url == "MODERATION_ERROR":
                         await processing_msg.edit_text(
@@ -899,7 +899,7 @@ async def start_action_handler(callback: CallbackQuery):
                         # Успешная генерация - списываем средства
                         new_balance = balance - required_amount
                         db.update_user_balance(user_id, new_balance)
-                        
+                    
                         # Отправляем видео
                         try:
                             video_file = URLInputFile(result_url)
@@ -910,14 +910,14 @@ async def start_action_handler(callback: CallbackQuery):
                                 request_timeout=180
                             )
                             await processing_msg.delete()
-                            
+                        
                             db.save_generation(user_id, "motion_control", result_url, "")
                         except Exception as e:
                             logger.error(f"Ошибка отправки видео: {e}")
                             await processing_msg.edit_text(
                                 "❌ Не удалось отправить видео. Попробуйте позже."
                             )
-                    
+                
                     await callback.message.answer(
                         TEXTS['welcome_message'],
                         reply_markup=get_main_menu_keyboard(),
