@@ -244,3 +244,49 @@ async def documents_handler(callback: CallbackQuery):
         reply_markup=keyboard
     )
     await callback.answer()
+
+@router.callback_query(F.data == "my_motion_videos")
+async def my_motion_videos_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Управление движением(Kling)'"""
+    from database.database import Database
+    
+    user_id = callback.from_user.id
+    db = Database()
+    
+    # Получаем видео с управлением движением
+    cursor = db.conn.cursor()
+    cursor.execute('''
+        SELECT file_url, prompt, created_at FROM generations
+        WHERE user_id = ? AND type = 'motion_control'
+        ORDER BY created_at DESC
+    ''', (user_id,))
+    videos = cursor.fetchall()
+    
+    if not videos:
+        await callback.answer("У вас пока нет видео с управлением движением", show_alert=True)
+        return
+    
+    # Сначала отправляем все видео
+    for video_url, prompt, created_at in videos:
+        try:
+            video_file = URLInputFile(video_url)
+            await callback.bot.send_video(
+                chat_id=callback.message.chat.id,
+                video=video_file
+            )
+        except Exception as e:
+            print(f"Ошибка отправки видео: {e}")
+    
+    # В конце отправляем текст с кнопкой
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    
+    await callback.message.answer(
+        f"Ваши видео с управлением движением ({len(videos)})",
+        reply_markup=keyboard
+    )
+    
+    await callback.answer()
