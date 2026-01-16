@@ -1,12 +1,14 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+import logging
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 # File ID видео-примера для управления движением
-EXAMPLE_VIDEO_FILE_ID = "ТВОЙ_FILE_ID_СЮДА"  # Загрузи видео и получи file_id
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIIWWlqSu54i2hss1owSWQBJTsJ1rkUAAKJlQACnP5QSx7wz8ewuFyZOAQ"
 
 
 class MotionControlStates(StatesGroup):
@@ -23,6 +25,7 @@ async def motion_control_handler(callback: CallbackQuery):
     from keyboards.inline import get_motion_control_keyboard
     
     user_id = callback.from_user.id
+    logger.info(f"User {user_id} opened motion control")
     
     # Получаем баланс из БД
     db = Database()
@@ -56,8 +59,10 @@ async def motion_control_handler(callback: CallbackQuery):
             parse_mode="HTML",
             reply_markup=get_motion_control_keyboard()
         )
-    except:
+        logger.info(f"User {user_id}: Motion control page with video sent")
+    except Exception as e:
         # Если видео не загружено, отправляем просто текст
+        logger.warning(f"Failed to send video: {e}")
         await callback.message.answer(
             text,
             parse_mode="HTML",
@@ -72,6 +77,9 @@ async def control_motion_handler(callback: CallbackQuery, state: FSMContext):
     """Обработчик кнопки 'Управлять движением'"""
     from keyboards.inline import get_motion_quality_keyboard
     
+    user_id = callback.from_user.id
+    logger.info(f"User {user_id} started motion control process")
+    
     await callback.message.answer(
         "🎨 Выберите <b><i>качество</i></b> генерации:",
         parse_mode="HTML",
@@ -84,9 +92,10 @@ async def control_motion_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("motion_quality_"))
 async def motion_quality_handler(callback: CallbackQuery, state: FSMContext):
     """Обработчик выбора качества"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    
     quality = callback.data.replace("motion_quality_", "")
+    user_id = callback.from_user.id
+    
+    logger.info(f"User {user_id} selected quality: {quality}")
     
     # Сохраняем качество
     await state.update_data(motion_quality=quality)
@@ -113,12 +122,14 @@ async def motion_quality_handler(callback: CallbackQuery, state: FSMContext):
 @router.message(MotionControlStates.waiting_for_photo, F.photo)
 async def process_motion_photo(message: Message, state: FSMContext):
     """Обработчик получения фото"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    user_id = message.from_user.id
     
     # Получаем URL фото
     photo = message.photo[-1]
     file = await message.bot.get_file(photo.file_id)
     file_url = f"https://api.telegram.org/file/bot{message.bot.token}/{file.file_path}"
+    
+    logger.info(f"User {user_id} uploaded photo: {file_url}")
     
     # Сохраняем URL фото
     await state.update_data(motion_photo=file_url)
@@ -147,11 +158,20 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     from aiogram.types import URLInputFile
     import json
     
+    user_id = message.from_user.id
+    
+    logger.info(f"\n{'='*70}")
+    logger.info(f"🎬 MOTION CONTROL - VIDEO UPLOAD")
+    logger.info(f"User ID: {user_id}")
+    
     # Получаем URL видео
     video = message.video
     file = await bot.get_file(video.file_id)
     video_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
-    video_duration = video.duration  # Длительность в секундах
+    video_duration = video.duration
+    
+    logger.info(f"Video URL: {video_url}")
+    logger.info(f"Video duration: {video_duration} seconds")
     
     # Сохраняем URL видео
     await state.update_data(motion_video=video_url, video_duration=video_duration)
@@ -161,12 +181,15 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     quality = data.get("motion_quality", "720p")
     photo_url = data.get("motion_photo")
     
-    # Определяем character_orientation и максимальную длительность
-    character_orientation = "video"
-    max_duration = 30 if character_orientation == "video" else 10
+    logger.info(f"Quality: {quality}")
+    logger.info(f"Photo URL: {photo_url}")
+    
+    # Определяем максимальную длительность
+    max_duration = 30
     
     # Проверяем длительность видео
     if video_duration > max_duration:
+        logger.warning(f"Video too long: {video_duration}s > {max_duration}s")
         await message.answer(
             f"❌ Видео слишком длинное!\n\n"
             f"Максимальная длительность: <b>{max_duration} секунд</b>\n"
@@ -180,18 +203,31 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     price_per_second = 5.00 if quality == "720p" else 7.00
     required_amount = price_per_second * video_duration
     
+    logger.info(f"Price per second: {price_per_second}₽")
+    logger.info(f"Required amount: {required_amount}₽")
+    
     db = Database()
-    user = db.get_user(message.from_user.id)
+    user = db.get_user(user_id)
     balance = user['balance'] if user else 0.00
+    
+    logger.info(f"User balance: {balance}₽")
+    logger.info(f"{'='*70}\n")
     
     # Проверяем баланс
     if balance < required_amount:
+        logger.info(f"Insufficient balance. Saving pending action...")
+        
         # Сохраняем текущее состояние для продолжения после оплаты
         action_data = json.dumps({
             "back_to": "motion_control",
-            "state_data": data
+            "state_data": {
+                "motion_quality": quality,
+                "motion_photo": photo_url,
+                "motion_video": video_url,
+                "video_duration": video_duration
+            }
         })
-        db.save_pending_action(message.from_user.id, "motion_control_pending", action_data)
+        db.save_pending_action(user_id, "motion_control_pending", action_data)
         
         await message.answer(
             "Похоже, средств сейчас немного не хватает\n\n"
@@ -206,35 +242,44 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
         return
     
     # Баланс достаточен - начинаем генерацию
+    logger.info(f"✅ Balance sufficient. Starting generation...")
+    
     processing_msg = await message.answer(
-        "⭐ Начинается генерация видео подождите 10-15 минут,так как процесс довольно трудоемкий"
+        "⭐ Начинается генерация, пожалуйста подождите 5-10 минут, так как процесс довольно трудоемкий"
     )
     
     try:
         motion_client = MotionControlClient()
+        
+        logger.info(f"Creating motion control task...")
         
         # Создаем задачу
         task_id = await motion_client.create_task(
             image_url=photo_url,
             video_url=video_url,
             prompt="",
-            character_orientation=character_orientation,
+            character_orientation="video",
             mode=quality
         )
         
         if not task_id:
+            logger.error(f"Failed to create task")
             await processing_msg.edit_text(
                 "❌ Произошла ошибка при создании задачи. Попробуйте позже."
             )
             await state.clear()
             return
         
+        logger.info(f"Task created: {task_id}")
+        logger.info(f"Waiting for result...")
+        
         # Ожидаем результат (макс 20 минут)
         result_url = await motion_client.wait_for_result(task_id, max_attempts=120, delay=10)
         
         if result_url:
             if result_url == "MODERATION_ERROR":
-                # Ошибка модерации - баланс НЕ списывается
+                logger.warning(f"Moderation error for task {task_id}")
+                
                 await processing_msg.edit_text(
                     "😔 Упс! Не получилось создать видео\n\n"
                     "Система безопасности заблокировала запрос.\n\n"
@@ -245,12 +290,18 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
                     "💛 Не переживайте, баланс не пострадал"
                 )
             else:
+                logger.info(f"✅ Generation successful! Result URL: {result_url}")
+                
                 # Успешная генерация - списываем средства
                 new_balance = balance - required_amount
-                db.update_user_balance(message.from_user.id, new_balance)
+                db.update_user_balance(user_id, new_balance)
+                
+                logger.info(f"💰 Charged {required_amount}₽. New balance: {new_balance}₽")
                 
                 # Отправляем видео
                 try:
+                    logger.info(f"Sending video to user...")
+                    
                     video_file = URLInputFile(result_url)
                     await bot.send_video(
                         chat_id=message.chat.id,
@@ -260,9 +311,14 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
                     )
                     await processing_msg.delete()
                     
-                    db.save_generation(message.from_user.id, "motion_control", result_url, "")
+                    logger.info(f"✅ Video sent successfully!")
+                    
+                    db.save_generation(user_id, "motion_control", result_url, "")
+                    
+                    logger.info(f"💾 Generation saved to database")
+                    
                 except Exception as e:
-                    print(f"❌ Ошибка отправки видео: {e}")
+                    logger.error(f"❌ Error sending video: {e}")
                     await processing_msg.edit_text(
                         "❌ Не удалось отправить видео. Попробуйте позже."
                     )
@@ -273,6 +329,8 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
                 parse_mode="HTML"
             )
         else:
+            logger.error(f"❌ Result URL is None")
+            
             await processing_msg.edit_text(
                 "😔 Что-то пошло не так\n\n"
                 "Не удалось создать видео. Возможные причины:\n"
@@ -289,7 +347,7 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
             )
     
     except Exception as e:
-        print(f"❌ Ошибка генерации: {e}")
+        logger.error(f"❌ Generation error: {e}")
         import traceback
         traceback.print_exc()
         
@@ -303,7 +361,8 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
 @router.callback_query(F.data == "video_instruction_motion")
 async def video_instruction_motion_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Видео-инструкция' в разделе управления движением"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    user_id = callback.from_user.id
+    logger.info(f"User {user_id} requested video instruction")
     
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -312,7 +371,7 @@ async def video_instruction_motion_handler(callback: CallbackQuery):
     )
     
     await callback.message.answer_video(
-        video="ТВОЙ_FILE_ID_ИНСТРУКЦИИ",  # Загрузи видео-инструкцию
+        video="ТВОЙ_FILE_ID_ИНСТРУКЦИИ",
         caption="<b>📹 Видео-инструкция по управлению движением</b>\n\n"
                 "Всего пару минут — и вы узнаете, как добиться качественного и эффектного результата ✨",
         parse_mode="HTML",
@@ -325,6 +384,9 @@ async def video_instruction_motion_handler(callback: CallbackQuery):
 async def top_up_balance_motion_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Пополнить баланс' из раздела управления движением"""
     from keyboards.inline import get_balance_amounts_keyboard
+    
+    user_id = callback.from_user.id
+    logger.info(f"User {user_id} requested balance top-up from motion control")
     
     await callback.message.answer(
         "💰 Выберите сумму для пополнения:",
