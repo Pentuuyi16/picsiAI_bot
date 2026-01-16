@@ -189,9 +189,9 @@ def get_motion_control_keyboard():
     """Создаёт клавиатуру для раздела управления движением"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Управлять движением", callback_data="control_motion")],
+            [InlineKeyboardButton(text="🕺 Управлять движением", callback_data="control_motion")],
             [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_motion")],
-            [InlineKeyboardButton(text="Пополнить баланс", callback_data="top_up_balance_motion")],
+            [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_motion")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ]
     )

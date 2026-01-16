@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -14,6 +14,7 @@ class MotionControlStates(StatesGroup):
     waiting_for_quality = State()
     waiting_for_photo = State()
     waiting_for_video = State()
+    waiting_for_prompt = State()  # НОВОЕ состояние
 
 
 @router.callback_query(F.data == "motion_control")
@@ -84,8 +85,6 @@ async def control_motion_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("motion_quality_"))
 async def motion_quality_handler(callback: CallbackQuery, state: FSMContext):
     """Обработчик выбора качества"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    
     quality = callback.data.replace("motion_quality_", "")
     
     # Сохраняем качество
@@ -113,8 +112,6 @@ async def motion_quality_handler(callback: CallbackQuery, state: FSMContext):
 @router.message(MotionControlStates.waiting_for_photo, F.photo)
 async def process_motion_photo(message: Message, state: FSMContext):
     """Обработчик получения фото"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    
     # Получаем URL фото
     photo = message.photo[-1]
     file = await message.bot.get_file(photo.file_id)
@@ -138,19 +135,12 @@ async def process_motion_photo(message: Message, state: FSMContext):
 
 
 @router.message(MotionControlStates.waiting_for_video, F.video)
-async def process_motion_video(message: Message, state: FSMContext, bot):
+async def process_motion_video(message: Message, state: FSMContext):
     """Обработчик получения видео"""
-    from database.database import Database
-    from keyboards.inline import get_payment_methods_keyboard, get_main_menu_keyboard
-    from utils.texts import TEXTS
-    from utils.motion_control_client import MotionControlClient
-    from aiogram.types import URLInputFile
-    import json
-    
     # Получаем URL видео
     video = message.video
-    file = await bot.get_file(video.file_id)
-    video_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
+    file = await message.bot.get_file(video.file_id)
+    video_url = f"https://api.telegram.org/file/bot{message.bot.token}/{file.file_path}"
     video_duration = video.duration  # Длительность в секундах
     
     # Сохраняем URL видео
@@ -159,11 +149,9 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     # Получаем данные
     data = await state.get_data()
     quality = data.get("motion_quality", "720p")
-    photo_url = data.get("motion_photo")
     
-    # Определяем character_orientation и максимальную длительность
-    character_orientation = "video"
-    max_duration = 30 if character_orientation == "video" else 10
+    # Определяем максимальную длительность
+    max_duration = 30
     
     # Проверяем длительность видео
     if video_duration > max_duration:
@@ -176,6 +164,40 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
         )
         return
     
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="motion_control")]
+        ]
+    )
+    
+    # НОВОЕ: Просим отправить текстовый запрос
+    await message.answer(
+        "📝 Отлично! Теперь <b><i>опишите текстом</i></b>, что должно происходить в видео",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
+    await state.set_state(MotionControlStates.waiting_for_prompt)
+
+
+@router.message(MotionControlStates.waiting_for_prompt, F.text)
+async def process_motion_prompt(message: Message, state: FSMContext, bot):
+    """НОВЫЙ: Обработчик получения текстового описания"""
+    from database.database import Database
+    from keyboards.inline import get_payment_methods_keyboard, get_main_menu_keyboard
+    from utils.texts import TEXTS
+    from utils.motion_control_client import MotionControlClient
+    from aiogram.types import URLInputFile
+    import json
+    
+    prompt = message.text
+    
+    # Получаем данные
+    data = await state.get_data()
+    quality = data.get("motion_quality", "720p")
+    photo_url = data.get("motion_photo")
+    video_url = data.get("motion_video")
+    video_duration = data.get("video_duration", 5)
+    
     # Рассчитываем стоимость
     price_per_second = 5.00 if quality == "720p" else 7.00
     required_amount = price_per_second * video_duration
@@ -187,9 +209,16 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     # Проверяем баланс
     if balance < required_amount:
         # Сохраняем текущее состояние для продолжения после оплаты
+        await state.update_data(motion_prompt=prompt)  # Сохраняем промпт
         action_data = json.dumps({
             "back_to": "motion_control",
-            "state_data": data
+            "state_data": {
+                "motion_quality": quality,
+                "motion_photo": photo_url,
+                "motion_video": video_url,
+                "video_duration": video_duration,
+                "motion_prompt": prompt  # Добавляем промпт
+            }
         })
         db.save_pending_action(message.from_user.id, "motion_control_pending", action_data)
         
@@ -217,8 +246,8 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
         task_id = await motion_client.create_task(
             image_url=photo_url,
             video_url=video_url,
-            prompt="",
-            character_orientation=character_orientation,
+            prompt=prompt,  # Используем промпт
+            character_orientation="video",
             mode=quality
         )
         
@@ -260,7 +289,7 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
                     )
                     await processing_msg.delete()
                     
-                    db.save_generation(message.from_user.id, "motion_control", result_url, "")
+                    db.save_generation(message.from_user.id, "motion_control", result_url, prompt)
                 except Exception as e:
                     print(f"❌ Ошибка отправки видео: {e}")
                     await processing_msg.edit_text(
@@ -303,8 +332,6 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
 @router.callback_query(F.data == "video_instruction_motion")
 async def video_instruction_motion_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Видео-инструкция' в разделе управления движением"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Назад", callback_data="motion_control")]

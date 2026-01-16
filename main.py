@@ -1,10 +1,10 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher
-from aiogram.types import BotCommand
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import BotCommand, Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
-from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support,motion_control
+from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support, motion_control
 from webhook_server import start_webhook_server
 
 # Настройка логирования
@@ -25,10 +25,10 @@ async def main():
     
     # Настраиваем команды бота (меню)
     commands = [
-        BotCommand(command="menu", description="Главное меню"),
-        BotCommand(command="pay", description="Пополнить счёт"),
-        BotCommand(command="cabinet", description="Личный кабинет"),
-        BotCommand(command="help", description="Поддержка")
+        BotCommand(command="menu", description="🏠 Главное меню"),
+        BotCommand(command="pay", description="💳 Пополнить счёт"),
+        BotCommand(command="lk", description="👤 Личный кабинет"),
+        BotCommand(command="help", description="💬 Поддержка")
     ]
     await bot.set_my_commands(commands)
     logger.info("✅ Команды бота настроены")
@@ -44,6 +44,23 @@ async def main():
     dp.include_router(cabinet.router)
     dp.include_router(support.router)
     
+    # Временный обработчик для получения file_id видео
+    @dp.message(F.video)
+    async def get_video_file_id(message: Message):
+        """Временный обработчик для получения file_id видео"""
+        file_id = message.video.file_id
+        await message.answer(f"📹 Video File ID:\n`{file_id}`", parse_mode="Markdown")
+        print(f"📹 Video File ID: {file_id}")
+        logger.info(f"📹 Video File ID: {file_id}")
+    
+    # Временный обработчик для получения file_id фото
+    @dp.message(F.photo)
+    async def get_photo_file_id(message: Message):
+        """Временный обработчик для получения file_id фото"""
+        file_id = message.photo[-1].file_id
+        await message.answer(f"📸 Photo File ID:\n`{file_id}`", parse_mode="Markdown")
+        print(f"📸 Photo File ID: {file_id}")
+        logger.info(f"📸 Photo File ID: {file_id}")
     
     logger.info("🚀 Бот запущен")
     
