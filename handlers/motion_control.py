@@ -170,7 +170,18 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     video_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
     video_duration = video.duration
     
-    # ДОБАВЛЕНО: Проверка разрешения видео
+    # ДОБАВЛЕНО: Детальная информация о файле
+    logger.info(f"===== FILE INFO =====")
+    logger.info(f"File ID: {video.file_id}")
+    logger.info(f"File unique ID: {video.file_unique_id}")
+    logger.info(f"File name: {video.file_name if hasattr(video, 'file_name') else 'N/A'}")
+    logger.info(f"MIME type: {video.mime_type}")
+    logger.info(f"File size: {video.file_size} bytes ({video.file_size / (1024*1024):.2f} MB)")
+    logger.info(f"File path from Telegram: {file.file_path}")
+    logger.info(f"Full file URL: {video_url}")
+    logger.info(f"=====================")
+    
+    # Проверяем разрешение видео
     video_width = video.width
     video_height = video.height
     
