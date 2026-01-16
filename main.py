@@ -43,25 +43,7 @@ async def main():
     dp.include_router(referral.router)
     dp.include_router(cabinet.router)
     dp.include_router(support.router)
-    
-    # Временный обработчик для получения file_id видео
-    @dp.message(F.video)
-    async def get_video_file_id(message: Message):
-        """Временный обработчик для получения file_id видео"""
-        file_id = message.video.file_id
-        await message.answer(f"📹 Video File ID:\n`{file_id}`", parse_mode="Markdown")
-        print(f"📹 Video File ID: {file_id}")
-        logger.info(f"📹 Video File ID: {file_id}")
-    
-    # Временный обработчик для получения file_id фото
-    @dp.message(F.photo)
-    async def get_photo_file_id(message: Message):
-        """Временный обработчик для получения file_id фото"""
-        file_id = message.photo[-1].file_id
-        await message.answer(f"📸 Photo File ID:\n`{file_id}`", parse_mode="Markdown")
-        print(f"📸 Photo File ID: {file_id}")
-        logger.info(f"📸 Photo File ID: {file_id}")
-    
+        
     logger.info("🚀 Бот запущен")
     
     # Запускаем webhook сервер

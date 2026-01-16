@@ -6,7 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 router = Router()
 
 # File ID видео-примера для управления движением
-EXAMPLE_VIDEO_FILE_ID = "ТВОЙ_FILE_ID_СЮДА"  # Загрузи видео и получи file_id
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIIWWlqSu54i2hss1owSWQBJTsJ1rkUAAKJlQACnP5QSx7wz8ewuFyZOAQ"  # Загрузи видео и получи file_id
 
 
 class MotionControlStates(StatesGroup):
