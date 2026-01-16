@@ -15,6 +15,7 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
     """Создаёт главное меню с инлайн-кнопками"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text="🕺 Управление движением", callback_data="motion_control")],
             [
                 InlineKeyboardButton(text="📸 Оживление фото", callback_data="photo_animation"),
                 InlineKeyboardButton(text="🎬 Создание видео", callback_data="video_generation")
@@ -179,6 +180,32 @@ def get_cabinet_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_cabinet")],
             [InlineKeyboardButton(text="📑 Документы", callback_data="documents")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    return keyboard
+
+def get_motion_control_keyboard():
+    """Создаёт клавиатуру для раздела управления движением"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Управлять движением", callback_data="control_motion")],
+            [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_motion")],
+            [InlineKeyboardButton(text="Пополнить баланс", callback_data="top_up_balance_motion")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    return keyboard
+
+
+def get_motion_quality_keyboard():
+    """Создаёт клавиатуру для выбора качества управления движением"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="720p", callback_data="motion_quality_720p"),
+                InlineKeyboardButton(text="1080p", callback_data="motion_quality_1080p")
+            ],
+            [InlineKeyboardButton(text="Назад", callback_data="motion_control")]
         ]
     )
     return keyboard

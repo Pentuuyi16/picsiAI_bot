@@ -11,7 +11,8 @@ from keyboards.inline import (
     get_edit_aspect_ratio_keyboard,
     get_video_format_keyboard,
     get_main_menu_keyboard,
-    get_cabinet_keyboard
+    get_cabinet_keyboard,
+    get_motion_control_keyboard
 )
 import aiohttp
 from PIL import Image
@@ -265,6 +266,43 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == "back_to_motion_control")
+async def back_to_motion_control_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Назад' - возврат в управление движением"""
+    from database.database import Database
+    
+    user_id = callback.from_user.id
+    
+    db = Database()
+    user = db.get_user(user_id)
+    balance = user['balance'] if user else 0.00
+    
+    text = (
+        "<b>✨ Наш бот умеет управлять движением</b>\n\n"
+        "<b>Готовы создать видео, которое удивляет?</b>\n\n"
+        "1️⃣ <b><i>Выберите качество</i></b> — 720p или 1080p.\n"
+        "2️⃣ <b><i>Загрузите фото</i></b> в бот — быстро и просто.\n"
+        "3️⃣ <b><i>Отправьте видео-пример</i></b> для управления движением.\n"
+        "4️⃣ <b><i>Подождите</i></b> 5–10 минут — и получите своё уникальное видео!\n\n"
+        "<b><i>Создавайте контент</i></b>, который цепляет и выделяет вас 💫\n\n"
+        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
+        f"📹 Генерация видео 720p 1 секунда = 5₽\n"
+        f"📹 Генерация видео 1080p 1 секунда = 7₽</blockquote>"
+    )
+    
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    
+    await callback.message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_motion_control_keyboard()
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data == "back_to_personal_cabinet")
 async def back_to_personal_cabinet_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Назад' - возврат в личный кабинет"""
@@ -485,6 +523,7 @@ async def start_action_handler(callback: CallbackQuery):
     from utils.api_client import KieApiClient
     from utils.veo_api_client import VeoApiClient
     from utils.image_edit_client import ImageEditClient
+    from utils.motion_control_client import MotionControlClient
     import json
     import logging
     
@@ -813,6 +852,89 @@ async def start_action_handler(callback: CallbackQuery):
                 await processing_msg.edit_text("❌ Произошла ошибка при редактировании.")
             except:
                 await callback.message.answer("❌ Произошла ошибка при редактировании.")
+    
+    elif action_type == "motion_control_pending":
+        # Управление движением
+        state_data = action_data.get("state_data", {})
+        
+        quality = state_data.get("motion_quality", "720p")
+        photo_url = state_data.get("motion_photo")
+        video_url = state_data.get("motion_video")
+        video_duration = state_data.get("video_duration", 5)
+        
+        # Рассчитываем стоимость
+        price_per_second = 5.00 if quality == "720p" else 7.00
+        required_amount = price_per_second * video_duration
+        
+        if balance < required_amount:
+            await callback.message.answer("❌ Недостаточно средств для генерации видео")
+            return
+        
+        processing_msg = await callback.message.answer(
+            "⭐ Начинается генерация видео с управлением движением, совсем скоро пришлем результат"
+        )
+        
+        try:
+            motion_client = MotionControlClient()
+            
+            task_id = await motion_client.create_task(
+                image_url=photo_url,
+                video_url=video_url,
+                prompt="",
+                character_orientation="video",
+                mode=quality
+            )
+            
+            if task_id:
+                result_url = await motion_client.wait_for_result(task_id, max_attempts=120, delay=10)
+                
+                if result_url:
+                    if result_url == "MODERATION_ERROR":
+                        await processing_msg.edit_text(
+                            "😔 Упс! Не получилось создать видео\n\n"
+                            "Система безопасности заблокировала запрос.\n\n"
+                            "💛 Не переживайте, баланс не пострадал"
+                        )
+                    else:
+                        # Успешная генерация - списываем средства
+                        new_balance = balance - required_amount
+                        db.update_user_balance(user_id, new_balance)
+                        
+                        # Отправляем видео
+                        try:
+                            video_file = URLInputFile(result_url)
+                            await callback.bot.send_video(
+                                chat_id=callback.message.chat.id,
+                                video=video_file,
+                                caption="✨ Ваше видео с управлением движением готово!",
+                                request_timeout=180
+                            )
+                            await processing_msg.delete()
+                            
+                            db.save_generation(user_id, "motion_control", result_url, "")
+                        except Exception as e:
+                            logger.error(f"Ошибка отправки видео: {e}")
+                            await processing_msg.edit_text(
+                                "❌ Не удалось отправить видео. Попробуйте позже."
+                            )
+                    
+                    await callback.message.answer(
+                        TEXTS['welcome_message'],
+                        reply_markup=get_main_menu_keyboard(),
+                        parse_mode="HTML"
+                    )
+                else:
+                    await processing_msg.edit_text(
+                        "😔 Что-то пошло не так. Не переживайте, баланс не пострадал"
+                    )
+            else:
+                await processing_msg.edit_text("❌ Не удалось создать задачу.")
+        except Exception as e:
+            logger.error(f"Ошибка: {e}", exc_info=True)
+            try:
+                await processing_msg.edit_text("❌ Произошла ошибка при генерации.")
+            except:
+                await callback.message.answer("❌ Произошла ошибка при генерации.")
     
     # Очищаем pending action после выполнения
     db.clear_pending_action(user_id)

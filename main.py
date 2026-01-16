@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
-from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support
+from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support,motion_control
 from webhook_server import start_webhook_server
 
 # Настройка логирования
@@ -35,6 +35,7 @@ async def main():
     
     # Подключаем роутеры из handlers
     dp.include_router(start.router)
+    dp.include_router(motion_control.router)
     dp.include_router(photo_animation.router)
     dp.include_router(video_generation.router)
     dp.include_router(image_editing.router)
