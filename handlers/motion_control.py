@@ -158,11 +158,20 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     from aiogram.types import URLInputFile
     import json
     
+    user_id = message.from_user.id
+    
+    logger.info(f"\n{'='*70}")
+    logger.info(f"🎬 MOTION CONTROL - VIDEO UPLOAD")
+    logger.info(f"User ID: {user_id}")
+    
     # Получаем URL видео
     video = message.video
     file = await bot.get_file(video.file_id)
     video_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
-    video_duration = video.duration  # Длительность в секундах
+    video_duration = video.duration
+    
+    logger.info(f"Video URL: {video_url}")
+    logger.info(f"Video duration: {video_duration} seconds")
     
     # Сохраняем URL видео
     await state.update_data(motion_video=video_url, video_duration=video_duration)
@@ -172,12 +181,15 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     quality = data.get("motion_quality", "720p")
     photo_url = data.get("motion_photo")
     
-    # Определяем character_orientation и максимальную длительность
-    character_orientation = "video"
-    max_duration = 30 if character_orientation == "video" else 10
+    logger.info(f"Quality: {quality}")
+    logger.info(f"Photo URL: {photo_url}")
+    
+    # Определяем максимальную длительность
+    max_duration = 30
     
     # Проверяем длительность видео
     if video_duration > max_duration:
+        logger.warning(f"Video too long: {video_duration}s > {max_duration}s")
         await message.answer(
             f"❌ Видео слишком длинное!\n\n"
             f"Максимальная длительность: <b>{max_duration} секунд</b>\n"
@@ -191,18 +203,31 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     price_per_second = 5.00 if quality == "720p" else 7.00
     required_amount = price_per_second * video_duration
     
+    logger.info(f"Price per second: {price_per_second}₽")
+    logger.info(f"Required amount: {required_amount}₽")
+    
     db = Database()
-    user = db.get_user(message.from_user.id)
+    user = db.get_user(user_id)
     balance = user['balance'] if user else 0.00
+    
+    logger.info(f"User balance: {balance}₽")
+    logger.info(f"{'='*70}\n")
     
     # Проверяем баланс
     if balance < required_amount:
+        logger.info(f"Insufficient balance. Saving pending action...")
+        
         # Сохраняем текущее состояние для продолжения после оплаты
         action_data = json.dumps({
             "back_to": "motion_control",
-            "state_data": data
+            "state_data": {
+                "motion_quality": quality,
+                "motion_photo": photo_url,
+                "motion_video": video_url,
+                "video_duration": video_duration
+            }
         })
-        db.save_pending_action(message.from_user.id, "motion_control_pending", action_data)
+        db.save_pending_action(user_id, "motion_control_pending", action_data)
         
         await message.answer(
             "Похоже, средств сейчас немного не хватает\n\n"
@@ -215,100 +240,6 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
         )
         await state.clear()
         return
-    
-    # Баланс достаточен - начинаем генерацию
-    processing_msg = await message.answer(
-        "⭐ Начинается генерация видео с управлением движением, совсем скоро пришлем результат"
-    )
-    
-    try:
-        motion_client = MotionControlClient()
-        
-        # Создаем задачу
-        task_id = await motion_client.create_task(
-            image_url=photo_url,
-            video_url=video_url,
-            prompt="",
-            character_orientation=character_orientation,
-            mode=quality
-        )
-        
-        if not task_id:
-            await processing_msg.edit_text(
-                "❌ Произошла ошибка при создании задачи. Попробуйте позже."
-            )
-            await state.clear()
-            return
-        
-        # Ожидаем результат (макс 20 минут)
-        result_url = await motion_client.wait_for_result(task_id, max_attempts=120, delay=10)
-        
-        if result_url:
-            if result_url == "MODERATION_ERROR":
-                # Ошибка модерации - баланс НЕ списывается
-                await processing_msg.edit_text(
-                    "😔 Упс! Не получилось создать видео\n\n"
-                    "Система безопасности заблокировала запрос.\n\n"
-                    "Частые причины:\n"
-                    "• На фото известная личность\n"
-                    "• В видео неподходящий контент\n\n"
-                    "💡 Совет: используйте обычные фотографии и нейтральные видео\n\n"
-                    "💛 Не переживайте, баланс не пострадал"
-                )
-            else:
-                # Успешная генерация - списываем средства
-                new_balance = balance - required_amount
-                db.update_user_balance(message.from_user.id, new_balance)
-                
-                # Отправляем видео
-                try:
-                    video_file = URLInputFile(result_url)
-                    await bot.send_video(
-                        chat_id=message.chat.id,
-                        video=video_file,
-                        caption="✨ Ваше видео с управлением движением готово!",
-                        request_timeout=180
-                    )
-                    await processing_msg.delete()
-                    
-                    db.save_generation(message.from_user.id, "motion_control", result_url, "")
-                except Exception as e:
-                    print(f"❌ Ошибка отправки видео: {e}")
-                    await processing_msg.edit_text(
-                        "❌ Не удалось отправить видео. Попробуйте позже."
-                    )
-            
-            await message.answer(
-                TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
-                parse_mode="HTML"
-            )
-        else:
-            await processing_msg.edit_text(
-                "😔 Что-то пошло не так\n\n"
-                "Не удалось создать видео. Возможные причины:\n"
-                "• Превышено время ожидания\n"
-                "• Временные проблемы с сервером\n\n"
-                "💡 Попробуйте ещё раз через пару минут\n\n"
-                "💛 Не переживайте, баланс не пострадал"
-            )
-            
-            await message.answer(
-                TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
-                parse_mode="HTML"
-            )
-    
-    except Exception as e:
-        print(f"❌ Ошибка генерации: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        await processing_msg.edit_text(
-            "❌ Произошла ошибка при генерации. Попробуйте позже."
-        )
-    
-    await state.clear()
     
     # Баланс достаточен - начинаем генерацию
     logger.info(f"✅ Balance sufficient. Starting generation...")
