@@ -58,27 +58,48 @@ class MotionControlClient:
             print(f"Orientation: {character_orientation}")
             print(f"Mode: {mode}")
             print(f"Prompt: {prompt[:100] if prompt else 'None'}")
+            print(f"\n📦 Full Payload:")
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
             print(f"{'='*70}\n")
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=payload, timeout=30) as response:
-                    result = await response.json()
+                    # ДОБАВЛЕНО: Читаем raw response
+                    response_text = await response.text()
+                    print(f"\n📥 RAW API RESPONSE:")
+                    print(f"Status Code: {response.status}")
+                    print(f"Response Body: {response_text}")
+                    print(f"{'='*50}\n")
                     
-                    print(f"📦 API Response:")
+                    # Пытаемся распарсить JSON
+                    try:
+                        result = json.loads(response_text)
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Ошибка парсинга JSON: {e}")
+                        print(f"Response text: {response_text}")
+                        return None
+                    
+                    print(f"📊 PARSED API Response:")
                     print(f"   Code: {result.get('code')}")
                     print(f"   Message: {result.get('message')}")
+                    print(f"   Data: {result.get('data')}")
                     
                     if result.get("code") == 200 and result.get("data", {}).get("taskId"):
                         task_id = result["data"]["taskId"]
-                        print(f"✅ Task ID: {task_id}")
+                        print(f"\n✅ Task ID создан: {task_id}\n")
                         return task_id
                     else:
-                        print(f"❌ Ошибка создания задачи: {result}")
+                        print(f"\n❌ Ошибка создания задачи!")
+                        print(f"Full API Response:")
+                        print(json.dumps(result, indent=2, ensure_ascii=False))
+                        print()
                         return None
         
         except Exception as e:
             logger.error(f"Ошибка при создании задачи: {e}", exc_info=True)
             print(f"❌ Exception: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     async def get_task_status(self, task_id: str):
