@@ -196,7 +196,7 @@ class MotionControlClient:
                         return public_url
                     
                     logger.warning(f"Не удалось получить URL с file.io: {public_url}")
-                    return video_url
+                    return image_url
                     
         
         except Exception as e:
