@@ -659,7 +659,7 @@ async def start_action_handler(callback: CallbackQuery):
             return
         
         processing_msg = await callback.message.answer(
-            "⭐ Начинается генерация видео подождите 10-15 минут,так как процесс довольно трудоемкий"
+            "⭐ Начинается генерация видео, совсем скоро пришлем результат"
         )
         
         try:
