@@ -31,6 +31,7 @@ class MotionControlClient:
         temp_output = None
         
         try:
+            logger.info(f"🎬 НАЧАЛО КОНВЕРТАЦИИ ВИДЕО")
             logger.info(f"📥 Скачиваем видео из Telegram: {video_url}")
             
             # Скачиваем видео
@@ -49,11 +50,15 @@ class MotionControlClient:
             temp_input.write(video_data)
             temp_input.close()
             
+            logger.info(f"💾 Временный файл создан: {temp_input.name}")
+            
             # Конвертируем в mp4
             temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
             temp_output.close()
             
             logger.info(f"🔄 Конвертируем видео в MP4...")
+            logger.info(f"Input: {temp_input.name}")
+            logger.info(f"Output: {temp_output.name}")
             
             ffmpeg_cmd = [
                 'ffmpeg',
@@ -68,6 +73,8 @@ class MotionControlClient:
                 temp_output.name
             ]
             
+            logger.info(f"🎬 Запускаем FFmpeg: {' '.join(ffmpeg_cmd)}")
+            
             result = subprocess.run(
                 ffmpeg_cmd,
                 stdout=subprocess.PIPE,
@@ -76,16 +83,26 @@ class MotionControlClient:
             )
             
             if result.returncode != 0:
-                logger.error(f"FFmpeg error: {result.stderr.decode()}")
+                logger.error(f"❌ FFmpeg error (code {result.returncode}):")
+                logger.error(f"STDERR: {result.stderr.decode()}")
+                logger.error(f"STDOUT: {result.stdout.decode()}")
                 return video_url
             
             logger.info(f"✅ Видео конвертировано в MP4")
+            
+            # Проверяем что файл создан
+            if not os.path.exists(temp_output.name):
+                logger.error(f"❌ Выходной файл не создан: {temp_output.name}")
+                return video_url
+            
+            output_size = os.path.getsize(temp_output.name)
+            logger.info(f"📦 Размер выходного файла: {output_size / (1024*1024):.2f} MB")
             
             # Читаем конвертированное видео
             with open(temp_output.name, 'rb') as f:
                 converted_video_data = f.read()
                 converted_size_mb = len(converted_video_data) / (1024 * 1024)
-                logger.info(f"📦 Размер после конвертации: {converted_size_mb:.2f} MB")
+                logger.info(f"✅ Видео прочитано: {converted_size_mb:.2f} MB")
             
             # Загружаем на telegra.ph
             logger.info(f"📤 Загружаем на telegra.ph...")
@@ -101,12 +118,17 @@ class MotionControlClient:
             )
             
             async with aiohttp.ClientSession() as session:
-                async with session.post(upload_url, data=form_data, timeout=60) as response:
+                async with session.post(upload_url, data=form_data, timeout=120) as response:
+                    logger.info(f"Telegraph response status: {response.status}")
+                    
                     if response.status != 200:
+                        response_text = await response.text()
                         logger.error(f"Ошибка загрузки на telegraph: HTTP {response.status}")
+                        logger.error(f"Response: {response_text}")
                         return video_url
                     
                     result = await response.json()
+                    logger.info(f"Telegraph result: {result}")
                     
                     if isinstance(result, list) and len(result) > 0:
                         file_path = result[0].get('src', '')
@@ -119,17 +141,23 @@ class MotionControlClient:
                     return video_url
         
         except subprocess.TimeoutExpired:
-            logger.error("FFmpeg timeout (>60 sec)")
+            logger.error("❌ FFmpeg timeout (>60 sec)")
             return video_url
         except Exception as e:
-            logger.error(f"❌ Ошибка при конвертации/загрузке видео: {e}", exc_info=True)
+            logger.error(f"❌ EXCEPTION в convert_and_upload_video: {e}", exc_info=True)
+            logger.error(f"Video URL был: {video_url}")
             return video_url
         finally:
             # Удаляем временные файлы
-            if temp_input and os.path.exists(temp_input.name):
-                os.unlink(temp_input.name)
-            if temp_output and os.path.exists(temp_output.name):
-                os.unlink(temp_output.name)
+            try:
+                if temp_input and os.path.exists(temp_input.name):
+                    os.unlink(temp_input.name)
+                    logger.info(f"🗑️ Удален temp input: {temp_input.name}")
+                if temp_output and os.path.exists(temp_output.name):
+                    os.unlink(temp_output.name)
+                    logger.info(f"🗑️ Удален temp output: {temp_output.name}")
+            except Exception as e:
+                logger.error(f"Ошибка удаления временных файлов: {e}")
     
     async def upload_image_to_telegraph(self, image_url: str) -> str:
         """Загружает изображение на telegra.ph"""
@@ -139,6 +167,7 @@ class MotionControlClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_url) as response:
                     if response.status != 200:
+                        logger.error(f"Ошибка скачивания изображения: HTTP {response.status}")
                         return image_url
                     
                     image_data = await response.read()
@@ -157,11 +186,13 @@ class MotionControlClient:
             )
             
             async with aiohttp.ClientSession() as session:
-                async with session.post(upload_url, data=form_data) as response:
+                async with session.post(upload_url, data=form_data, timeout=30) as response:
                     if response.status != 200:
+                        logger.error(f"Ошибка загрузки изображения на telegraph: HTTP {response.status}")
                         return image_url
                     
                     result = await response.json()
+                    logger.info(f"Telegraph image result: {result}")
                     
                     if isinstance(result, list) and len(result) > 0:
                         file_path = result[0].get('src', '')
@@ -170,10 +201,11 @@ class MotionControlClient:
                             logger.info(f"✅ Изображение загружено: {public_url}")
                             return public_url
                     
+                    logger.warning(f"Не удалось получить URL изображения с telegra.ph")
                     return image_url
         
         except Exception as e:
-            logger.error(f"❌ Ошибка загрузки изображения: {e}")
+            logger.error(f"❌ Ошибка загрузки изображения: {e}", exc_info=True)
             return image_url
     
     async def create_task(self, image_url: str, video_url: str, prompt: str = "", 
@@ -186,7 +218,9 @@ class MotionControlClient:
             "Authorization": f"Bearer {self.api_key}"
         }
         
-        logger.info(f"📤 Подготовка файлов...")
+        logger.info(f"📤 Подготовка файлов для Kling API...")
+        logger.info(f"Original Image URL: {image_url}")
+        logger.info(f"Original Video URL: {video_url}")
         
         # Загружаем изображение
         public_image_url = await self.upload_image_to_telegraph(image_url)
@@ -224,7 +258,8 @@ class MotionControlClient:
                     
                     try:
                         result = json.loads(response_text)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Ошибка парсинга JSON: {e}")
                         return None
                     
                     if result.get("code") == 200 and result.get("data", {}).get("taskId"):
@@ -232,11 +267,12 @@ class MotionControlClient:
                         logger.info(f"✅ Task ID: {task_id}")
                         return task_id
                     else:
-                        logger.error(f"❌ Ошибка: {json.dumps(result, indent=2)}")
+                        logger.error(f"❌ Ошибка создания задачи:")
+                        logger.error(f"{json.dumps(result, indent=2)}")
                         return None
         
         except Exception as e:
-            logger.error(f"❌ Exception: {e}", exc_info=True)
+            logger.error(f"❌ Exception в create_task: {e}", exc_info=True)
             return None
     
     async def get_task_status(self, task_id: str):
@@ -251,7 +287,8 @@ class MotionControlClient:
                     if result.get("code") == 200 and result.get("data"):
                         return result["data"]
                     return None
-        except:
+        except Exception as e:
+            logger.error(f"Ошибка get_task_status: {e}")
             return None
     
     async def wait_for_result(self, task_id: str, max_attempts: int = 120, delay: int = 10):
