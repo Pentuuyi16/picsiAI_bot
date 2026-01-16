@@ -210,9 +210,6 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
     user = db.get_user(user_id)
     balance = user['balance'] if user else 0.00
     
-    logger.info(f"User balance: {balance}₽")
-    logger.info(f"{'='*70}\n")
-    
     # Проверяем баланс
     if balance < required_amount:
         logger.info(f"Insufficient balance. Saving pending action...")
