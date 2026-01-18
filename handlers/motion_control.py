@@ -319,6 +319,13 @@ async def process_motion_video(message: Message, state: FSMContext, bot):
                     "💡 Совет: используйте обычные фотографии и нейтральные видео\n\n"
                     "💛 Не переживайте, баланс не пострадал"
                 )
+            elif result_url == "FORMAT_ERROR":
+                logger.warning(f"Format error for task {task_id}")
+                
+                await processing_msg.edit_text(
+                    "😅 Упс, Kling не поддерживает формат этого видео и поэтому не может его обработать 😅\n\n"
+                    "Можешь скинуть другое?"
+                )
             else:
                 logger.info(f"✅ Generation successful! Result URL: {result_url}")
                 

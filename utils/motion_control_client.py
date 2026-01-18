@@ -2,9 +2,6 @@ import aiohttp
 import asyncio
 import json
 import logging
-import tempfile
-import os
-import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -17,192 +14,6 @@ class MotionControlClient:
         self.base_url = "https://api.kie.ai/api/v1/jobs"
         self.model = "kling-2.6/motion-control"
     
-    async def convert_and_upload_video(self, video_url: str) -> str:
-        """
-        Скачивает видео, конвертирует в mp4 и загружает на file.io
-        
-        Args:
-            video_url: URL видео из Telegram
-        
-        Returns:
-            Публичный URL конвертированного видео
-        """
-        temp_input = None
-        temp_output = None
-        
-        try:
-            logger.info(f"🎬 НАЧАЛО КОНВЕРТАЦИИ ВИДЕО")
-            logger.info(f"📥 Скачиваем видео из Telegram: {video_url}")
-            
-            # Скачиваем видео
-            async with aiohttp.ClientSession() as session:
-                async with session.get(video_url) as response:
-                    if response.status != 200:
-                        logger.error(f"Ошибка скачивания: HTTP {response.status}")
-                        return video_url
-                    
-                    video_data = await response.read()
-                    video_size_mb = len(video_data) / (1024 * 1024)
-                    logger.info(f"✅ Видео скачано: {video_size_mb:.2f} MB")
-            
-            # Сохраняем во временный файл
-            temp_input = tempfile.NamedTemporaryFile(delete=False, suffix='.mov')
-            temp_input.write(video_data)
-            temp_input.close()
-            
-            logger.info(f"💾 Временный файл создан: {temp_input.name}")
-            
-            # Конвертируем в mp4
-            temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            temp_output.close()
-            
-            logger.info(f"🔄 Конвертируем видео в MP4...")
-            logger.info(f"Input: {temp_input.name}")
-            logger.info(f"Output: {temp_output.name}")
-            
-            ffmpeg_cmd = [
-                'ffmpeg',
-                '-i', temp_input.name,
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-crf', '23',
-                '-c:a', 'aac',
-                '-b:a', '128k',
-                '-movflags', '+faststart',
-                '-y',
-                temp_output.name
-            ]
-            
-            logger.info(f"🎬 Запускаем FFmpeg...")
-            
-            result = subprocess.run(
-                ffmpeg_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=60
-            )
-            
-            if result.returncode != 0:
-                logger.error(f"❌ FFmpeg error (code {result.returncode})")
-                return video_url
-            
-            logger.info(f"✅ Видео конвертировано в MP4")
-            
-            # Проверяем что файл создан
-            if not os.path.exists(temp_output.name):
-                logger.error(f"❌ Выходной файл не создан")
-                return video_url
-            
-            output_size = os.path.getsize(temp_output.name)
-            logger.info(f"📦 Размер выходного файла: {output_size / (1024*1024):.2f} MB")
-            
-            # Читаем конвертированное видео
-            with open(temp_output.name, 'rb') as f:
-                converted_video_data = f.read()
-                converted_size_mb = len(converted_video_data) / (1024 * 1024)
-                logger.info(f"✅ Видео прочитано: {converted_size_mb:.2f} MB")
-            
-            # Загружаем на file.io
-            logger.info(f"📤 Загружаем на file.io...")
-            
-            upload_url = "https://0x0.st"
-            
-            form_data = aiohttp.FormData()
-            form_data.add_field(
-                'file',
-                converted_video_data,
-                filename='video.mp4',
-                content_type='video/mp4'
-            )
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(upload_url, data=form_data, timeout=120) as response:
-                    logger.info(f"file.io response status: {response.status}")
-                    
-                    if response.status != 200:
-                        response_text = await response.text()
-                        logger.error(f"Ошибка загрузки на file.io: HTTP {response.status}")
-                        logger.error(f"Response: {response_text}")
-                        return video_url
-                    
-                    public_url = await response.text()
-                    public_url = public_url.strip()
-                    logger.info(f"file.io result: {public_url}")
-                    
-                    if public_url.startswith('http'):
-                        logger.info(f"✅ Видео загружено на 0x0.st: {public_url}")
-                        return public_url
-                    
-                    logger.warning(f"Не удалось получить URL с file.io: {public_url}")
-                    return video_url
-        
-        except subprocess.TimeoutExpired:
-            logger.error("❌ FFmpeg timeout (>60 sec)")
-            return video_url
-        except Exception as e:
-            logger.error(f"❌ EXCEPTION в convert_and_upload_video: {e}", exc_info=True)
-            logger.error(f"Video URL был: {video_url}")
-            return video_url
-        finally:
-            # Удаляем временные файлы
-            try:
-                if temp_input and os.path.exists(temp_input.name):
-                    os.unlink(temp_input.name)
-                    logger.info(f"🗑️ Удален temp input")
-                if temp_output and os.path.exists(temp_output.name):
-                    os.unlink(temp_output.name)
-                    logger.info(f"🗑️ Удален temp output")
-            except Exception as e:
-                logger.error(f"Ошибка удаления временных файлов: {e}")
-    
-    async def upload_image_to_fileio(self, image_url: str) -> str:
-        """Загружает изображение на file.io"""
-        try:
-            logger.info(f"📥 Скачиваем изображение: {image_url}")
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(image_url) as response:
-                    if response.status != 200:
-                        logger.error(f"Ошибка скачивания изображения: HTTP {response.status}")
-                        return image_url
-                    
-                    image_data = await response.read()
-                    logger.info(f"✅ Изображение скачано: {len(image_data) / 1024:.2f} KB")
-            
-            logger.info(f"📤 Загружаем изображение на file.io...")
-            
-            upload_url = "https://0x0.st"
-            
-            form_data = aiohttp.FormData()
-            form_data.add_field(
-                'file',
-                image_data,
-                filename='image.jpg',
-                content_type='image/jpeg'
-            )
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(upload_url, data=form_data, timeout=30) as response:
-                    if response.status != 200:
-                        logger.error(f"Ошибка загрузки изображения на file.io: HTTP {response.status}")
-                        return image_url
-                    
-                    public_url = await response.text()
-                    public_url = public_url.strip()
-                    logger.info(f"file.io result: {public_url}")
-                    
-                    if public_url.startswith('http'):
-                        logger.info(f"✅ Видео загружено на 0x0.st: {public_url}")
-                        return public_url
-                    
-                    logger.warning(f"Не удалось получить URL с file.io: {public_url}")
-                    return image_url
-                    
-        
-        except Exception as e:
-            logger.error(f"❌ Ошибка загрузки изображения: {e}", exc_info=True)
-            return image_url
-    
     async def create_task(self, image_url: str, video_url: str, prompt: str = "", 
                           character_orientation: str = "video", mode: str = "720p"):
         """Создает задачу на генерацию с управлением движением"""
@@ -213,24 +24,15 @@ class MotionControlClient:
             "Authorization": f"Bearer {self.api_key}"
         }
         
-        logger.info(f"📤 Подготовка файлов для Kling API...")
-        logger.info(f"Original Image URL: {image_url}")
-        logger.info(f"Original Video URL: {video_url}")
-        
-        # Загружаем изображение
-        public_image_url = await self.upload_image_to_fileio(image_url)
-        
-        # Конвертируем и загружаем видео
-        public_video_url = await self.convert_and_upload_video(video_url)
-        
-        logger.info(f"🔗 Public Image URL: {public_image_url}")
-        logger.info(f"🔗 Public Video URL: {public_video_url}")
+        logger.info(f"📤 Создание задачи Motion Control...")
+        logger.info(f"Image URL: {image_url}")
+        logger.info(f"Video URL: {video_url}")
         
         payload = {
             "model": self.model,
             "input": {
-                "input_urls": [public_image_url],
-                "video_urls": [public_video_url],
+                "input_urls": [image_url],
+                "video_urls": [video_url],
                 "character_orientation": character_orientation,
                 "mode": mode
             }
@@ -313,9 +115,16 @@ class MotionControlClient:
                 return None
             
             elif state == "fail":
-                logger.error(f"❌ Провал: {data.get('failMsg')}")
-                if "moderation" in str(data.get('failMsg')).lower():
+                fail_msg = data.get('failMsg', '')
+                logger.error(f"❌ Провал: {fail_msg}")
+                
+                # Проверяем разные типы ошибок
+                fail_msg_lower = fail_msg.lower()
+                if "moderation" in fail_msg_lower:
                     return "MODERATION_ERROR"
+                elif "format" in fail_msg_lower or "unsupported" in fail_msg_lower:
+                    return "FORMAT_ERROR"
+                
                 return None
             
             await asyncio.sleep(delay)
