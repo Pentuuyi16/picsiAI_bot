@@ -21,7 +21,7 @@ MACBOOK_PROMPT = (
 
 class MacbookStates(StatesGroup):
     waiting_for_photo = State()
-    waiting_for_aspect = State()  # ← НОВОЕ СОСТОЯНИЕ
+    waiting_for_aspect = State()
 
 
 @router.callback_query(F.data == "trend_macbook")
@@ -53,7 +53,6 @@ async def trend_macbook_handler(callback: CallbackQuery, state: FSMContext):
 
 @router.message(MacbookStates.waiting_for_photo, F.photo)
 async def process_macbook_photo(message: Message, state: FSMContext, bot):
-    """Обработчик фото - сохраняет и просит выбрать соотношение"""
     user_id = message.from_user.id
     
     photo = message.photo[-1]
@@ -62,10 +61,8 @@ async def process_macbook_photo(message: Message, state: FSMContext, bot):
     
     print(f"🎨 User {user_id} - Macbook trend photo: {photo_url}")
     
-    # Сохраняем URL фото
     await state.update_data(photo_url=photo_url)
     
-    # Просим выбрать соотношение сторон
     from keyboards.inline import get_trend_aspect_ratio_keyboard
     
     await message.answer(
@@ -79,11 +76,10 @@ async def process_macbook_photo(message: Message, state: FSMContext, bot):
 
 @router.callback_query(MacbookStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
 async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot):
-    """Обработчик выбора соотношения сторон"""
     from utils.nano_banana_edit_client import NanoBananaEditClient
     from aiogram.types import URLInputFile
+    from database.database import Database
     
-    # Определяем соотношение
     aspect_map = {
         "trend_aspect_16_9": "16:9",
         "trend_aspect_9_16": "9:16",
@@ -92,7 +88,6 @@ async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot
     
     aspect_ratio = aspect_map[callback.data]
     
-    # Получаем сохраненные данные
     data = await state.get_data()
     photo_url = data.get("photo_url")
     
@@ -102,6 +97,32 @@ async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot
         return
     
     user_id = callback.from_user.id
+    
+    # ========== ПРОВЕРКА ГЕНЕРАЦИЙ ==========
+    db = Database()
+    generations = db.get_user_generations(user_id)
+    
+    if generations < 1:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            ]
+        )
+        
+        await callback.message.answer(
+            "У вас закончились генерации 😔\n\n"
+            f"<blockquote>⚡ Доступно: {generations} генераций\n"
+            f"🎨 Один тренд = 1 генерация</blockquote>\n\n"
+            "Купите пакет генераций, чтобы продолжить!",
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.clear()
+        await callback.answer()
+        return
+    # ========================================
+    
     print(f"🎨 User {user_id} - Selected aspect ratio: {aspect_ratio}")
     
     processing_msg = await callback.message.answer(
@@ -114,7 +135,7 @@ async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot
         task_id = await edit_client.create_edit_task(
             prompt=MACBOOK_PROMPT,
             image_urls=[photo_url],
-            image_size=aspect_ratio,  # ← ИСПОЛЬЗУЕМ ВЫБРАННОЕ СООТНОШЕНИЕ
+            image_size=aspect_ratio,
             output_format="png"
         )
         
@@ -137,9 +158,14 @@ async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot
                     "Частые причины:\n"
                     "• На фото известная личность\n"
                     "• Неподходящий контент\n\n"
-                    "💡 Совет: используйте обычные фотографии"
+                    "💡 Совет: используйте обычные фотографии\n\n"
+                    "💛 Не переживайте, генерация не списана"
                 )
             else:
+                # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
+                db.subtract_generations(user_id, 1)
+                # ========================================
+                
                 print(f"✅ Generation successful! Result URL: {result_url}")
                 
                 try:
@@ -153,6 +179,8 @@ async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot
                     await processing_msg.delete()
                     
                     print(f"✅ Photo sent successfully!")
+
+                    db.save_generation(user_id, "trend_macbook", result_url, MACBOOK_PROMPT)
 
                     from keyboards.inline import get_trends_keyboard
                     await callback.message.answer(
@@ -171,7 +199,8 @@ async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot
                 "Не удалось отредактировать фото. Возможные причины:\n"
                 "• Превышено время ожидания\n"
                 "• Временные проблемы с сервером\n\n"
-                "💡 Попробуйте ещё раз через пару минут"
+                "💡 Попробуйте ещё раз через пару минут\n\n"
+                "💛 Не переживайте, генерация не списана"
             )
     
     except Exception as e:

@@ -92,6 +92,32 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext,
         return
     
     user_id = callback.from_user.id
+
+     # ========== ПРОВЕРКА ГЕНЕРАЦИЙ ==========
+    db = Database()
+    generations = db.get_user_generations(user_id)
+    
+    if generations < 1:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            ]
+        )
+        
+        await callback.message.answer(
+            "У вас закончились генерации 😔\n\n"
+            f"<blockquote>⚡ Доступно: {generations} генераций\n"
+            f"🎨 Один тренд = 1 генерация</blockquote>\n\n"
+            "Купите пакет генераций, чтобы продолжить!",
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.clear()
+        await callback.answer()
+        return
+    
+
     print(f"🎨 User {user_id} - Selected aspect ratio: {aspect_ratio}")
     
     processing_msg = await callback.message.answer(
@@ -130,6 +156,9 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext,
                     "💡 Совет: используйте обычные фотографии"
                 )
             else:
+
+                db.subtract_generations(user_id, 1)
+                
                 print(f"✅ Generation successful! Result URL: {result_url}")
                 
                 try:
