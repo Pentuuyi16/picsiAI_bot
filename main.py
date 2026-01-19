@@ -51,7 +51,13 @@ async def main():
     webhook_runner = await start_webhook_server(bot, host='127.0.0.1', port=8080)
     logger.info("✅ Webhook сервер запущен на 127.0.0.1:8080")
 
-
+    @dp.message(F.photo)
+    async def get_photo_file_id(message: Message):
+        photo = message.photo[-1]
+        await message.answer(
+            f"<b>File ID:</b>\n<code>{photo.file_id}</code>",
+            parse_mode="HTML"
+        )
     # Запускаем polling
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
