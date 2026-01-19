@@ -26,10 +26,10 @@ async def main():
     
     # Настраиваем команды бота (меню)
     commands = [
-        BotCommand(command="menu", description="🏠 Главное меню"),
-        BotCommand(command="pay", description="💳 Пополнить счёт"),
-        BotCommand(command="lk", description="👤 Личный кабинет"),
-        BotCommand(command="help", description="💬 Поддержка")
+        BotCommand(command="menu", description="Главное меню"),
+        BotCommand(command="pay", description="Пополнить счёт"),
+        BotCommand(command="lk", description="Личный кабинет"),
+        BotCommand(command="help", description="Поддержка")
     ]
     await bot.set_my_commands(commands)
     logger.info("✅ Команды бота настроены")
@@ -46,15 +46,12 @@ async def main():
     dp.include_router(support.router)
     dp.include_router(trends_router)
     dp.include_router(generation_purchase.router)
-    
-    # Временный обработчик для получения file_id (регистрируем в самом конце)
-    dp.message.register(get_photo_file_id, F.photo)
-    
     logger.info("🚀 Бот запущен")
     
     # Запускаем webhook сервер
     webhook_runner = await start_webhook_server(bot, host='127.0.0.1', port=8080)
     logger.info("✅ Webhook сервер запущен на 127.0.0.1:8080")
+
 
 
     # Запускаем polling
