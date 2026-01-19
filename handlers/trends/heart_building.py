@@ -190,9 +190,10 @@ async def process_heart_building_aspect(callback: CallbackQuery, state: FSMConte
                         generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
                     generation_text += "</blockquote>"
 
-                    await callback.message.answer(
-                        "Выберите тренд, который лучше всего вам подходит 💫",
-                        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
+                    await bot.send_message(
+                        chat_id=callback.message.chat.id,
+                        text=f"Выберите тренд, который лучше всего вам подходит 💫\n\n{generation_text}",\
+                        parse_mode="HTML",
                         reply_markup=get_trends_keyboard(page=1)
                     )
                     
