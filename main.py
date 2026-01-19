@@ -52,6 +52,16 @@ async def main():
     webhook_runner = await start_webhook_server(bot, host='127.0.0.1', port=8080)
     logger.info("✅ Webhook сервер запущен на 127.0.0.1:8080")
 
+    async def get_photo_file_id(message: Message):
+        """Временный обработчик для получения file_id фотографий"""
+        if message.photo:
+            file_id = message.photo[-1].file_id
+            await message.reply(
+                f"📷 <b>File ID фото:</b>\n\n"
+                f"<code>{file_id}</code>\n\n"
+                f"Скопируй этот ID для использования в боте!",
+                parse_mode="HTML"
+            )
 
     # Запускаем polling
     try:

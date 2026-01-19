@@ -16,13 +16,12 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔥 Тренды", callback_data="trends")],
-            [InlineKeyboardButton(text="🕺 Управление движением(Kling)", callback_data="motion_control")],
+            [InlineKeyboardButton(text="🎨 Редактирование изображений", callback_data="image_editing")],
             [
                 InlineKeyboardButton(text="📸 Оживление фото", callback_data="photo_animation"),
                 InlineKeyboardButton(text="🎬 Создание видео", callback_data="video_generation")
             ],
-            [InlineKeyboardButton(text="🎨 Редактирование изображений", callback_data="image_editing")],
-            [InlineKeyboardButton(text="💎 Реферальная система", callback_data="referral_system")],
+            [InlineKeyboardButton(text="🕺 Управление движением(Kling)", callback_data="motion_control")],
             [InlineKeyboardButton(text="Написать в поддержку", callback_data="support")],
             [InlineKeyboardButton(text="Личный кабинет", callback_data="personal_cabinet")]
         ]
@@ -180,8 +179,9 @@ def get_cabinet_keyboard() -> InlineKeyboardMarkup:
             ],
             [InlineKeyboardButton(text="🎨 Мои отредактированные изображения", callback_data="my_edited_images")],
             [InlineKeyboardButton(text="🕺 Мои управление движением", callback_data="my_motion_videos")],
+            [InlineKeyboardButton(text="💎 Реферальная система", callback_data="referral_system")],
             [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_cabinet")],
-            [InlineKeyboardButton(text="📑 Документы", callback_data="documents")],
+            [InlineKeyboardButton(text="Документы", callback_data="documents")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ]
     )

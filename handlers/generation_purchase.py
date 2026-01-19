@@ -8,7 +8,7 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 GENERATION_PACKAGES = {
-    "gen_10": {"count": 10, "price": 100.0},
+    "gen_10": {"count": 10, "price": 99.0},
     "gen_25": {"count": 25, "price": 199.0},
     "gen_50": {"count": 50, "price": 399.0},
     "gen_100": {"count": 100, "price": 799.0}
@@ -20,10 +20,10 @@ async def buy_generations_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Купить генерации'"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="10 генераций - 100₽", callback_data="select_gen_10")],
-            [InlineKeyboardButton(text="25 генераций - 199₽", callback_data="select_gen_25")],
+            [InlineKeyboardButton(text="10 генераций - 99₽", callback_data="select_gen_10")],
+            [InlineKeyboardButton(text="🔥 25 генераций - 199₽", callback_data="select_gen_25")],
             [InlineKeyboardButton(text="50 генераций - 399₽", callback_data="select_gen_50")],
-            [InlineKeyboardButton(text="100 генераций - 799₽", callback_data="select_gen_100")],
+            [InlineKeyboardButton(text="🔥 100 генераций - 799₽", callback_data="select_gen_100")],
             [InlineKeyboardButton(text="Назад", callback_data="back_from_gen_purchase")]
         ]
     )
