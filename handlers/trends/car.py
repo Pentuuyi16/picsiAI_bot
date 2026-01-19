@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDK2luU7WvT6AQEA-GdRQCggjyXl0GAAL0EWsbsx1wS_UmYmNSYuTwAQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOGGluojp7nbFBKw0xsgaDCclmOxYPAAIsFWsbSD9wSwQtYC8rzqwtAQADAgADeQADOAQ"
 
 CAR_PROMPT = (
     "сделай реалистично черно белый портрет будто девушка и парень едут на машине , "

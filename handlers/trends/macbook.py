@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAICc2ls5nYFz72tzlt3dxyodaIS_1e3AAKUD2sbsmNpSx62VHH-Up53AQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOJWluowS26osrvYk-kJzmuvu3kOUhAAI6FWsbSD9wS-hjRNal4hq1AQADAgADeQADOAQ"
 
 MACBOOK_PROMPT = (
     "Make a vertical 3-frame low-res webcam collage of the same female subject. "

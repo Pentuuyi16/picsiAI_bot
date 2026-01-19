@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDJWluU6dyuIDP1o-S_9p31nOoyS3cAAIvEmsbdZlwS4NpeTTah_7PAQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIN8mluoRkvRL--TTE1ow1KOomYDopYAAMVaxtIP3BLBSpumdGpsNEBAAMCAAN5AAM4BA"
 
 HEART_BUILDING_PROMPT = (
     "Create a realistic photo without changing your face. "

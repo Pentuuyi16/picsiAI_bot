@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDJ2luU6s7Rcom5I8T3jK7rp4jQ56YAAISFWsbJvFwS7Mp8xi2styXAQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOHmluok2kQF0pfQc311ebHBcetuKwAAIvFWsbSD9wS0ot3b5oVW2eAQADAgADeQADOAQ"
 
 BOUQUET_PROMPT_TEMPLATE = (
     "A girl sits in an apartment at night, surrounded by large, expensive bouquets of white and red roses. "

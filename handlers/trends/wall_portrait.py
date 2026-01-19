@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDKWluU7HGocWLB7y18gABF_IlnvSaFQACZRRrGybxcEuCusO1Lfb4wAEAAwIAA3kAAzgE"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIN_GluoYtjfAKu47OaQKydDYJG9ugvAAIFFWsbSD9wS316h40v-qTMAQADAgADeQADOAQ"
 
 WALL_PORTRAIT_PROMPT = (
     "Using the attached images as a reference for the girl's face and appearance, "

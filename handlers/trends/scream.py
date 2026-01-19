@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDLWluU7kZeGshbxrY8afb2MB4C009AAIkFWsbJvFwS1CJZNb5TD53AQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOFmluojarzIs11Vk7JW8qESYLa8ryAAIrFWsbSD9wS2ezxeJYsvuQAQADAgADeQADOAQ"
 
 SCREAM_PROMPT = (
     "Портрет в стиле y2k с атмосферой мечтательности: я лежу на блестящем розовом сатиновом постельном белье ,"

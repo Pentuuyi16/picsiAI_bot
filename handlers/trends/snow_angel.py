@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDGmluUubPVfa4q7ZLcpjDo59F3vXLAAIrEmsbdZlwS4j_nbBBzqlHAQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOI2luol9rNO9bvPBp1SGe5j5NgEpQAAIwFWsbSD9wS3qnSJ7HUI4-AQADAgADeQADOAQ"
 
 SNOW_ANGEL_PROMPT = (
     "A young angelic woman kneeling in fresh snow in a dark winter forest at night. "

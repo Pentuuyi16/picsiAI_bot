@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDMWluU8UwOVj_692F6gsCRjhnzhqhAAIRFWsbJvFwS0aM54_kaIm3AQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOEmluoi5_aMPaTa4ZSuEmsXXwfLLLAAIoFWsbSD9wS8FHjDFZDSUwAQADAgADeQADOAQ"
 
 LOVING_GAZE_PROMPT = (
     "создай изображение на котором парень и девушка с фото сидят вместе в темном месте "

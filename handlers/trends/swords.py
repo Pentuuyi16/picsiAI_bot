@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDL2luU7219yh9zE-f-5-i9_xJPaTgAAIwEmsbdZlwS-sYXMy3XekJAQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOGmluokFN3Ojk5DfeepD-ZVVYb7HhAAItFWsbSD9wS6-RY6BVyNO0AQADAgADeQADOAQ"
 
 SWORDS_PROMPT = (
     "Grassy hill covered with short wild grass, flat gray overcast sky, soft dramatic clouds, "

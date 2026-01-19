@@ -6,7 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 router = Router()
 
 # File ID фотографии примера
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIDtWlub49X-J5Wug8Po08bW7TaukD7AAKbFmsbJvFwS-MWqVrqJT6YAQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIN9mluoS85_tjYEoGIYuAWOQGDw1G8AAIBFWsbSD9wS_w_3PPNn4KLAQADAgADeQADOAQ"
 
 # Готовый промпт для редактирования
 SNOWBOARD_PROMPT = (
