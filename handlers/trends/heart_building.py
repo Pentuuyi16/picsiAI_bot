@@ -184,6 +184,12 @@ async def process_heart_building_aspect(callback: CallbackQuery, state: FSMConte
                     
                     from keyboards.inline import get_trends_keyboard
                     generations = db.get_user_generations(user_id)
+
+                    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
+                    if generations == 1:
+                        generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
+                    generation_text += "</blockquote>"
+
                     await callback.message.answer(
                         "Выберите тренд, который лучше всего вам подходит 💫",
                         f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
