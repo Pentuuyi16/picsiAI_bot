@@ -35,104 +35,173 @@ async def yookassa_webhook(request):
         if event == 'payment.succeeded' and paid and status == 'succeeded':
             db = Database()
             
-            # Находим платёж в БД
-            payment = db.get_payment(payment_id)
+            # Сначала проверяем, это покупка генераций или пополнение баланса
+            generation_purchase = db.get_generation_purchase(payment_id)
             
-            if not payment:
-                logger.error(f"❌ Платёж {payment_id} не найден в БД")
-                return web.Response(status=404)
-            
-            # Проверяем что платёж ещё не обработан
-            if payment['status'] == 'succeeded':
-                logger.info(f"⚠️ Платёж {payment_id} уже обработан")
-                return web.Response(status=200)
-            
-            user_id = payment['user_id']
-            amount = payment['amount']
-            
-            logger.info(f"💰 Начисляем баланс: user_id={user_id}, amount={amount}")
-            
-            # Начисляем баланс пользователю
-            db.add_to_balance(user_id, amount)
-            
-            # Обновляем статус платежа
-            db.update_payment_status(payment_id, 'succeeded')
-            
-            # Проверяем реферала и начисляем бонус
-            user = db.get_user(user_id)
-            if user and user.get('referrer_id'):
-                referrer_id = user['referrer_id']
-                referral_bonus = amount * 0.15  # 15% реферальный бонус
+            if generation_purchase:
+                # ========== ПОКУПКА ГЕНЕРАЦИЙ ==========
+                logger.info(f"💎 Обработка покупки генераций: {generation_purchase}")
                 
-                logger.info(f"💎 Начисляем реферальный бонус: referrer_id={referrer_id}, bonus={referral_bonus}")
+                # Проверяем что покупка ещё не обработана
+                if generation_purchase['status'] == 'succeeded':
+                    logger.info(f"⚠️ Покупка генераций {payment_id} уже обработана")
+                    return web.Response(status=200)
                 
-                # Начисляем бонус рефереру
-                db.add_to_balance(referrer_id, referral_bonus)
-                db.add_referral_earning(referrer_id, user_id, referral_bonus, amount)
+                user_id = generation_purchase['user_id']
+                generations_count = generation_purchase['package_size']
                 
-                # Уведомляем реферера
+                logger.info(f"⚡ Начисляем генерации: user_id={user_id}, count={generations_count}")
+                
+                # Начисляем генерации пользователю
+                db.add_generations(user_id, generations_count)
+                
+                # Обновляем статус покупки
+                db.update_generation_purchase_status(payment_id, 'succeeded')
+                
+                # Отправляем уведомление пользователю
                 try:
                     bot = request.app['bot']
-                    await bot.send_message(
-                        referrer_id,
-                        f"🎉 Ваш реферал пополнил баланс!\n\n"
-                        f"💰 Вам начислено: {referral_bonus:.2f} ₽"
+                    user_generations = db.get_user_generations(user_id)
+                    
+                    keyboard = InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                        ]
                     )
+                    
+                    await bot.send_message(
+                        user_id,
+                        f"💫 Оплата прошла успешно!\n\n"
+                        f"⚡ Начислено: {generations_count} генераций\n\n"
+                        f"<blockquote>Всего у вас: {user_generations} генераций</blockquote>",
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                    
+                    logger.info(f"✅ Уведомление о генерациях отправлено пользователю {user_id}")
                 except Exception as e:
-                    logger.error(f"Ошибка отправки уведомления рефереру: {e}")
+                    logger.error(f"Ошибка отправки уведомления о генерациях: {e}")
+                
+                logger.info(f"✅ Покупка генераций {payment_id} успешно обработана")
+                return web.Response(status=200)
             
-            # Отправляем уведомление пользователю
-            try:
-                bot = request.app['bot']
-                user_balance = db.get_user(user_id)['balance']
+            else:
+                # ========== ПОПОЛНЕНИЕ БАЛАНСА ==========
+                logger.info(f"💰 Обработка пополнения баланса")
                 
-                # Проверяем есть ли pending action
-                pending = db.get_pending_action(user_id)
+                # Находим платёж в БД
+                payment = db.get_payment(payment_id)
                 
-                if pending:
-                    action_type = pending['action_type']
-                    action_data = json.loads(pending['action_data'])
+                if not payment:
+                    logger.error(f"❌ Платёж {payment_id} не найден в БД")
+                    return web.Response(status=404)
+                
+                # Проверяем что платёж ещё не обработан
+                if payment['status'] == 'succeeded':
+                    logger.info(f"⚠️ Платёж {payment_id} уже обработан")
+                    return web.Response(status=200)
+                
+                user_id = payment['user_id']
+                amount = payment['amount']
+                
+                logger.info(f"💰 Начисляем баланс: user_id={user_id}, amount={amount}")
+                
+                # Начисляем баланс пользователю
+                db.add_to_balance(user_id, amount)
+                
+                # Обновляем статус платежа
+                db.update_payment_status(payment_id, 'succeeded')
+                
+                # Проверяем реферала и начисляем бонус
+                user = db.get_user(user_id)
+                if user and user.get('referrer_id'):
+                    referrer_id = user['referrer_id']
+                    referral_bonus = amount * 0.15  # 15% реферальный бонус
                     
-                    # Определяем требуемую сумму
-                    required_amount = 0
-                    action_emoji = ""
-                    action_text = ""
+                    logger.info(f"💎 Начисляем реферальный бонус: referrer_id={referrer_id}, bonus={referral_bonus}")
                     
-                    if action_type == "photo_animation_pending":
-                        required_amount = 40.00
-                        action_emoji = "📸"
-                        action_text = "оживление фото"
-                    elif action_type == "video_generation_pending":
-                        state_data = action_data.get("state_data", {})
-                        veo_model = state_data.get("veo_model", "veo3_fast")
-                        required_amount = 65.00 if veo_model == "veo3_fast" else 115.00
-                        action_emoji = "📹"
-                        action_text = "генерацию видео"
-                    elif action_type == "image_editing_pending":
-                        required_amount = 35.00
-                        action_emoji = "🎨"
-                        action_text = "редактирование изображения"
+                    # Начисляем бонус рефереру
+                    db.add_to_balance(referrer_id, referral_bonus)
+                    db.add_referral_earning(referrer_id, user_id, referral_bonus, amount)
                     
-                    # Проверяем хватает ли баланса
-                    if user_balance >= required_amount:
-                        # Баланса достаточно - предлагаем начать
-                        keyboard = InlineKeyboardMarkup(
-                            inline_keyboard=[
-                                [InlineKeyboardButton(text="Да", callback_data=f"start_action_{action_type}")],
-                                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
-                            ]
-                        )
-                        
+                    # Уведомляем реферера
+                    try:
+                        bot = request.app['bot']
                         await bot.send_message(
-                            user_id,
-                            f"{action_emoji} Мы готовы начинать {action_text}\n\n"
-                            f"Стартуем?\n"
-                            f"<blockquote>💰 Ваш баланс: {user_balance:.2f} ₽</blockquote>",
-                            parse_mode="HTML",
-                            reply_markup=keyboard
+                            referrer_id,
+                            f"🎉 Ваш реферал пополнил баланс!\n\n"
+                            f"💰 Вам начислено: {referral_bonus:.2f} ₽"
                         )
+                    except Exception as e:
+                        logger.error(f"Ошибка отправки уведомления рефереру: {e}")
+                
+                # Отправляем уведомление пользователю
+                try:
+                    bot = request.app['bot']
+                    user_balance = db.get_user(user_id)['balance']
+                    
+                    # Проверяем есть ли pending action
+                    pending = db.get_pending_action(user_id)
+                    
+                    if pending:
+                        action_type = pending['action_type']
+                        action_data = json.loads(pending['action_data'])
+                        
+                        # Определяем требуемую сумму
+                        required_amount = 0
+                        action_emoji = ""
+                        action_text = ""
+                        
+                        if action_type == "photo_animation_pending":
+                            required_amount = 40.00
+                            action_emoji = "📸"
+                            action_text = "оживление фото"
+                        elif action_type == "video_generation_pending":
+                            state_data = action_data.get("state_data", {})
+                            veo_model = state_data.get("veo_model", "veo3_fast")
+                            required_amount = 65.00 if veo_model == "veo3_fast" else 115.00
+                            action_emoji = "📹"
+                            action_text = "генерацию видео"
+                        elif action_type == "motion_control_pending":
+                            required_amount = 0  # Уточните стоимость
+                            action_emoji = "🕺"
+                            action_text = "управление движением"
+                        
+                        # Проверяем хватает ли баланса
+                        if user_balance >= required_amount:
+                            # Баланса достаточно - предлагаем начать
+                            keyboard = InlineKeyboardMarkup(
+                                inline_keyboard=[
+                                    [InlineKeyboardButton(text="Да", callback_data=f"start_action_{action_type}")],
+                                    [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                                ]
+                            )
+                            
+                            await bot.send_message(
+                                user_id,
+                                f"{action_emoji} Мы готовы начинать {action_text}\n\n"
+                                f"Стартуем?\n"
+                                f"<blockquote>💰 Ваш баланс: {user_balance:.2f} ₽</blockquote>",
+                                parse_mode="HTML",
+                                reply_markup=keyboard
+                            )
+                        else:
+                            # Баланса всё ещё недостаточно
+                            keyboard = InlineKeyboardMarkup(
+                                inline_keyboard=[
+                                    [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                                ]
+                            )
+                            
+                            await bot.send_message(
+                                user_id,
+                                f"💫 Оплата прошла успешно\n\n"
+                                f"<blockquote>Мой текущий баланс: {user_balance:.2f} ₽</blockquote>",
+                                parse_mode="HTML",
+                                reply_markup=keyboard
+                            )
                     else:
-                        # Баланса всё ещё недостаточно
+                        # Нет pending action - просто показываем баланс
                         keyboard = InlineKeyboardMarkup(
                             inline_keyboard=[
                                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
@@ -146,29 +215,14 @@ async def yookassa_webhook(request):
                             parse_mode="HTML",
                             reply_markup=keyboard
                         )
-                else:
-                    # Нет pending action - просто показываем баланс
-                    keyboard = InlineKeyboardMarkup(
-                        inline_keyboard=[
-                            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
-                        ]
-                    )
                     
-                    await bot.send_message(
-                        user_id,
-                        f"💫 Оплата прошла успешно\n\n"
-                        f"<blockquote>Мой текущий баланс: {user_balance:.2f} ₽</blockquote>",
-                        parse_mode="HTML",
-                        reply_markup=keyboard
-                    )
+                    logger.info(f"✅ Уведомление отправлено пользователю {user_id}")
+                except Exception as e:
+                    logger.error(f"Ошибка отправки уведомления пользователю: {e}")
                 
-                logger.info(f"✅ Уведомление отправлено пользователю {user_id}")
-            except Exception as e:
-                logger.error(f"Ошибка отправки уведомления пользователю: {e}")
-            
-            logger.info(f"✅ Платёж {payment_id} успешно обработан")
-            
-            return web.Response(status=200)
+                logger.info(f"✅ Платёж {payment_id} успешно обработан")
+                
+                return web.Response(status=200)
         
         # Другие события
         logger.info(f"ℹ️ Событие {event} - пропускаем")

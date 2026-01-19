@@ -1,28 +1,28 @@
 from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery, Message, URLInputFile, BufferedInputFile
+from aiogram.types import CallbackQuery, Message, URLInputFile, BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.inline import (
     get_image_editing_keyboard, 
-    get_edit_aspect_ratio_keyboard, 
+    get_edit_aspect_ratio_keyboard,
     get_main_menu_keyboard
 )
-from utils.nano_banana_edit_client import NanoBananaEditClient  # ← ИЗМЕНЕНО
+from utils.nano_banana_edit_client import NanoBananaEditClient
 from utils.texts import TEXTS
 import logging
 import aiohttp
 from PIL import Image
 from io import BytesIO
+import asyncio
 
 media_group_photos = {}
 
 router = Router()
-edit_client = NanoBananaEditClient()  # ← ИЗМЕНЕНО
+edit_client = NanoBananaEditClient()
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIEmGlj8f7yzyPbC7aOUAgsXnDojYLXAAIHnQACHSMgS6L_T5Q94hmLOAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIEuGlj9wdplHV8I7zOcjBEwTCm9aOgAALUnQACHSMgS7XAnHk3BfdnOAQ"
 
 
 # Временное хранилище для обработанных медиа-групп (по user_id)
@@ -107,10 +107,9 @@ async def image_editing_handler(callback: CallbackQuery):
     
     user_id = callback.from_user.id
     
-    # Получаем баланс из БД
+    # Получаем количество генераций
     db = Database()
-    user = db.get_user(user_id)
-    balance = user['balance'] if user else 0.00
+    generations = db.get_user_generations(user_id)
     
     text = (
         "✨ <b>Наш бот помогает преобразить изображения и раскрыть их по-новому!</b>\n\n"
@@ -119,8 +118,7 @@ async def image_editing_handler(callback: CallbackQuery):
         "2️⃣ <b><i>Опишите желаемые правки</i></b> — улучшение качества, изменение деталей или общего настроения.\n"
         "3️⃣ <b><i>Подождите всего пару минут</i></b> — и получите изображение с качественным редактированием.\n\n"
         "Ваши <b><i>фото</i></b> могут выглядеть ещё лучше 💫\n\n"
-        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"🎨 Редактирование 1 фото = 15₽</blockquote>"
+        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>"
     )
     
     # Удаляем старое сообщение
@@ -176,7 +174,7 @@ async def edit_aspect_handler(callback: CallbackQuery, state: FSMContext):
         reply_markup=keyboard
     )
     
-    # Переходим к ожиданию фото (пропускаем выбор качества)
+    # Переходим к ожиданию фото
     await state.set_state(ImageEditingStates.waiting_for_photos)
     await callback.answer()
 
@@ -252,9 +250,7 @@ async def handle_edit_photos(message: Message, state: FSMContext, bot: Bot):
 async def process_edit_description(message: Message, state: FSMContext, bot: Bot):
     """Обработчик описания редактирования"""
     from database.database import Database
-    from keyboards.inline import get_payment_methods_keyboard
     import json
-    import asyncio
     
     db = Database()
     user = db.get_user(message.from_user.id)
@@ -262,16 +258,15 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
     # Получаем данные состояния
     data = await state.get_data()
     
-    # Проверяем баланс
-    balance = user['balance'] if user else 0.00
-    required_amount = 15.00  # Стоимость редактирования изображения
+    # Проверяем количество генераций
+    generations = db.get_user_generations(message.from_user.id)
     
-    if balance < required_amount:
-        # Сохраняем текущее состояние для продолжения после оплаты
+    if generations < 1:
+        # Недостаточно генераций - предлагаем купить
         prompt = message.text
         action_data = json.dumps({
             "back_to": "image_editing",
-            "state_data": data,  # Сохраняем ВСЁ: соотношение, фото
+            "state_data": data,
             "prompt": prompt
         })
         db.save_pending_action(message.from_user.id, "image_editing_pending", action_data)
@@ -281,13 +276,20 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
         print(f"   Photos: {len(data.get('edit_photos', []))} шт")
         print(f"   Prompt: {prompt}")
         
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            ]
+        )
+        
         await message.answer(
-            "Похоже, средств сейчас немного не хватает\n\n"
-            f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-            f"🎨 Редактирование 1 фото = 15₽</blockquote>\n\n"
-            "Выберите способ оплаты ⤵️",
+            "У вас закончились генерации 😔\n\n"
+            f"<blockquote>⚡ Доступно: {generations} генераций\n"
+            f"🎨 Редактирование 1 фото = 1 генерация</blockquote>\n\n"
+            "Купите пакет генераций, чтобы продолжить!",
             parse_mode="HTML",
-            reply_markup=get_payment_methods_keyboard(back_to="image_editing")
+            reply_markup=keyboard
         )
         # НЕ очищаем состояние!
         return
@@ -309,7 +311,7 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
         task_id = await edit_client.create_edit_task(
             prompt=prompt,
             image_urls=photos,
-            image_size=aspect_ratio,  # ← ИЗМЕНЕНО: вместо aspect_ratio
+            image_size=aspect_ratio,
             output_format="png"
         )
         
@@ -330,7 +332,7 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
         
         if image_url:
             if image_url == "MODERATION_ERROR":
-                # Ошибка модерации - баланс НЕ списывается
+                # Ошибка модерации - генерация НЕ списывается
                 await processing_msg.edit_text(
                     "😔 Упс! Не получилось отредактировать изображение\n\n"
                     "Система безопасности заблокировала запрос.\n\n"
@@ -338,12 +340,11 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                     "• На фото известная личность\n"
                     "• В описании есть неподходящий контент\n\n"
                     "💡 Совет: используйте обычные фотографии и нейтральные описания\n\n"
-                    "💛 Не переживайте, баланс не пострадал"
+                    "💛 Не переживайте, генерация не списана"
                 )
             else:
-                # Успешная генерация - списываем средства
-                new_balance = balance - required_amount
-                db.update_user_balance(message.from_user.id, new_balance)
+                # Успешная генерация - списываем 1 генерацию
+                db.subtract_generations(message.from_user.id, 1)
                 
                 # Отправляем изображение
                 try:
@@ -404,7 +405,7 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                 "• Превышено время ожидания\n"
                 "• Временные проблемы с сервером\n\n"
                 "💡 Попробуйте ещё раз через пару минут\n\n"
-                "💛 Не переживайте, баланс не пострадал"
+                "💛 Не переживайте, генерация не списана"
             )
             
             # Автоматически открываем главное меню
@@ -452,7 +453,7 @@ async def video_instruction_editing_handler(callback: CallbackQuery):
     )
     
     await callback.message.answer_video(
-        video="BAACAgIAAxkBAAIEm2lj89wQUbrn5anGqPd_m0MfSz8OAAIunQACHSMgSwihmsAAAVHFmzgE",  # Вставь file_id видео-инструкции
+        video="BAACAgIAAxkBAAIEm2lj89wQUbrn5anGqPd_m0MfSz8OAAIunQACHSMgSwihmsAAAVHFmzgE",
         caption="<b>📹 Видео-инструкция по редактированию изображений</b>\n\n"
                 "Всего пару минут — и вы узнаете, как добиться качественного и эффектного результата ✨",
         parse_mode="HTML",
@@ -463,15 +464,7 @@ async def video_instruction_editing_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "top_up_balance_editing")
 async def top_up_balance_editing_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Пополнить баланс' из раздела редактирования"""
-    from keyboards.inline import get_balance_amounts_keyboard
-    
-    # Сохраняем контекст
-    from handlers.payment import user_balance_context
-    user_balance_context[callback.from_user.id] = "image_editing"
-    
-    await callback.message.answer(
-        "💰 Выберите сумму для пополнения:",
-        reply_markup=get_balance_amounts_keyboard(back_to="image_editing")
-    )
-    await callback.answer()
+    """Обработчик кнопки 'Купить генерации' из раздела редактирования"""
+    # Перенаправляем на покупку генераций
+    from handlers.generation_purchase import buy_generations_handler
+    await buy_generations_handler(callback)

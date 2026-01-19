@@ -12,8 +12,10 @@ class Database:
         self.create_tables()
         self.create_generations_table()
         self.update_users_table_for_referrals()
+        self.update_users_table_for_generations()  # ← НОВОЕ
         self.create_referral_earnings_table()
         self.create_payments_table()
+        self.create_generation_purchases_table()  # ← НОВОЕ
     
     def create_tables(self):
         """Создаёт необходимые таблицы, если они не существуют"""
@@ -28,7 +30,8 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 referrer_id INTEGER,
                 referral_balance REAL DEFAULT 0.0,
-                referral_code TEXT UNIQUE
+                referral_code TEXT UNIQUE,
+                generations INTEGER DEFAULT 0
             )
         ''')
     
@@ -42,6 +45,109 @@ class Database:
         ''')
     
         self.conn.commit()
+    
+    def update_users_table_for_generations(self):
+        """Добавляет поле generations в таблицу users (для старых БД)"""
+        self.cursor.execute("PRAGMA table_info(users)")
+        columns = [column[1] for column in self.cursor.fetchall()]
+    
+        if 'generations' not in columns:
+            try:
+                self.cursor.execute('ALTER TABLE users ADD COLUMN generations INTEGER DEFAULT 0')
+                self.conn.commit()
+                print("✅ Добавлено поле generations в таблицу users")
+            except Exception as e:
+                print(f"⚠️ Ошибка добавления поля generations: {e}")
+    
+    def create_generation_purchases_table(self):
+        """Создаёт таблицу для хранения покупок генераций"""
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS generation_purchases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                payment_id TEXT UNIQUE NOT NULL,
+                user_id INTEGER NOT NULL,
+                package_size INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (user_id)
+            )
+        ''')
+        self.conn.commit()
+    
+    def save_generation_purchase(self, payment_id: str, user_id: int, package_size: int, amount: float):
+        """Сохраняет покупку генераций в БД"""
+        self.cursor.execute('''
+            INSERT INTO generation_purchases (payment_id, user_id, package_size, amount, status)
+            VALUES (?, ?, ?, ?, 'pending')
+        ''', (payment_id, user_id, package_size, amount))
+        self.conn.commit()
+        print(f"💾 Покупка генераций сохранена: payment_id={payment_id}, user_id={user_id}, package={package_size}, amount={amount}")
+    
+    def get_generation_purchase(self, payment_id: str):
+        """Получает покупку генераций по payment_id"""
+        self.cursor.execute('SELECT * FROM generation_purchases WHERE payment_id = ?', (payment_id,))
+        row = self.cursor.fetchone()
+        if row:
+            return {
+                'id': row[0],
+                'payment_id': row[1],
+                'user_id': row[2],
+                'package_size': row[3],
+                'amount': row[4],
+                'status': row[5],
+                'created_at': row[6],
+                'completed_at': row[7]
+            }
+        return None
+    
+    def update_generation_purchase_status(self, payment_id: str, status: str):
+        """Обновляет статус покупки генераций"""
+        self.cursor.execute('''
+            UPDATE generation_purchases 
+            SET status = ?, completed_at = CURRENT_TIMESTAMP 
+            WHERE payment_id = ?
+        ''', (status, payment_id))
+        self.conn.commit()
+        print(f"✅ Статус покупки генераций обновлён: payment_id={payment_id}, status={status}")
+    
+    def add_generations(self, user_id: int, amount: int):
+        """Добавляет генерации пользователю"""
+        user = self.get_user(user_id)
+        if user:
+            current_generations = user.get('generations', 0)
+            new_generations = current_generations + amount
+            print(f"⚡ Пополнение генераций: User {user_id}, Old: {current_generations}, Add: {amount}, New: {new_generations}")
+            
+            self.cursor.execute('''
+                UPDATE users SET generations = ? WHERE user_id = ?
+            ''', (new_generations, user_id))
+            self.conn.commit()
+            
+            updated_user = self.get_user(user_id)
+            print(f"✅ Генерации после обновления: {updated_user.get('generations', 0)}")
+    
+    def subtract_generations(self, user_id: int, amount: int = 1):
+        """Списывает генерации у пользователя"""
+        user = self.get_user(user_id)
+        if user:
+            current_generations = user.get('generations', 0)
+            new_generations = max(0, current_generations - amount)
+            print(f"⚡ Списание генераций: User {user_id}, Old: {current_generations}, Subtract: {amount}, New: {new_generations}")
+            
+            self.cursor.execute('''
+                UPDATE users SET generations = ? WHERE user_id = ?
+            ''', (new_generations, user_id))
+            self.conn.commit()
+            
+            return True
+        return False
+    
+    def get_user_generations(self, user_id: int):
+        """Получает количество генераций пользователя"""
+        user = self.get_user(user_id)
+        return user.get('generations', 0) if user else 0
     
     def create_payments_table(self):
         """Создаёт таблицу для хранения платежей"""
@@ -191,22 +297,21 @@ class Database:
         self.cursor.execute('SELECT COUNT(*) FROM users WHERE referrer_id = ?', (user_id,))
         referrals_count = self.cursor.fetchone()[0]
         
-        self.cursor.execute('SELECT SUM(amount) FROM referral_earnings WHERE user_id = ?', (user_id,))
-        total_earned = self.cursor.fetchone()[0] or 0.0
+        self.cursor.execute('SELECT COALESCE(SUM(amount), 0.0) FROM referral_earnings WHERE user_id = ?', (user_id,))
+        total_earned = self.cursor.fetchone()[0]
         
         return {
             'referrals_count': referrals_count,
             'total_earned': total_earned
         }
     
-    def save_generation(self, user_id: int, gen_type: str, file_url: str, prompt: str = None):
-        """Сохраняет генерацию пользователя"""
+    def save_generation(self, user_id: int, generation_type: str, file_url: str, prompt: str = ""):
+        """Сохраняет генерацию в базу данных"""
         self.cursor.execute('''
             INSERT INTO generations (user_id, type, file_url, prompt)
             VALUES (?, ?, ?, ?)
-        ''', (user_id, gen_type, file_url, prompt))
+        ''', (user_id, generation_type, file_url, prompt))
         self.conn.commit()
-        print(f"💾 Сохранена генерация: user={user_id}, type={gen_type}")
     
     def get_user_photos(self, user_id: int):
         """Получает все оживлённые фото пользователя"""
@@ -218,7 +323,7 @@ class Database:
         return self.cursor.fetchall()
     
     def get_user_videos(self, user_id: int):
-        """Получает все сгенерированные видео пользователя"""
+        """Получает все видео пользователя"""
         self.cursor.execute('''
             SELECT file_url, prompt, created_at FROM generations
             WHERE user_id = ? AND type = 'video_generation'
@@ -239,8 +344,8 @@ class Database:
                  last_name: str = None):
         """Добавляет нового пользователя в базу данных"""
         self.cursor.execute('''
-            INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, balance)
-            VALUES (?, ?, ?, ?, 0.0)
+            INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, balance, generations)
+            VALUES (?, ?, ?, ?, 0.0, 0)
         ''', (user_id, username, first_name, last_name))
         self.conn.commit()
     
@@ -259,7 +364,8 @@ class Database:
                 'created_at': row[6],
                 'referrer_id': row[7] if len(row) > 7 else None,
                 'referral_balance': row[8] if len(row) > 8 else 0.0,
-                'referral_code': row[9] if len(row) > 9 else None
+                'referral_code': row[9] if len(row) > 9 else None,
+                'generations': row[10] if len(row) > 10 else 0
             }
         return None
     
@@ -318,6 +424,7 @@ class Database:
         """Удаляет незавершённое действие после выполнения"""
         self.cursor.execute('DELETE FROM pending_actions WHERE user_id = ?', (user_id,))
         self.conn.commit()
+        
     def get_total_users_count(self):
         """Получает общее количество пользователей"""
         self.cursor.execute("SELECT COUNT(*) FROM users")

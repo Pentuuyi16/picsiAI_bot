@@ -116,7 +116,7 @@ def get_image_editing_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="🎨 Отредактировать фото", callback_data="edit_photo")],
             [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_editing")],
-            [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_editing")],
+            [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ]
     )
@@ -238,7 +238,7 @@ def get_trends_keyboard(page: int = 1) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Фотка с криком", callback_data="trend_scream")
             ],
             [InlineKeyboardButton(text="Следующая страница →", callback_data="trends_page_2")],
-            [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="top_up_balance_trends")],  # ← ДОБАВИТЬ ЭТУ СТРОКУ
+            [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],  # ← ДОБАВИТЬ ЭТУ СТРОКУ
             [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
         ]
     )
