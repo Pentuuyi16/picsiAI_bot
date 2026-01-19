@@ -6,10 +6,9 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.inline import (
     get_image_editing_keyboard, 
     get_edit_aspect_ratio_keyboard, 
-    get_photo_quality_keyboard,
     get_main_menu_keyboard
 )
-from utils.image_edit_client import ImageEditClient
+from utils.nano_banana_edit_client import NanoBananaEditClient  # ← ИЗМЕНЕНО
 from utils.texts import TEXTS
 import logging
 import aiohttp
@@ -19,7 +18,7 @@ from io import BytesIO
 media_group_photos = {}
 
 router = Router()
-edit_client = ImageEditClient()
+edit_client = NanoBananaEditClient()  # ← ИЗМЕНЕНО
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера
@@ -36,7 +35,6 @@ media_group_photos = {}
 class ImageEditingStates(StatesGroup):
     """Состояния для процесса редактирования изображений"""
     waiting_for_aspect_ratio = State()
-    waiting_for_quality = State()
     waiting_for_photos = State()
     waiting_for_description = State()
 
@@ -164,28 +162,6 @@ async def edit_aspect_handler(callback: CallbackQuery, state: FSMContext):
     
     aspect_name = "квадратное" if aspect_ratio == "1:1" else "вертикальное" if aspect_ratio == "9:16" else "горизонтальное"
     
-    await callback.message.edit_text(
-        f"📐 Соотношение сторон: {aspect_name}\n\n"
-        f"🎨 Теперь <b><i>выберите</i></b> качество редактирования:",
-        parse_mode="HTML",
-        reply_markup=get_photo_quality_keyboard()
-    )
-    await state.set_state(ImageEditingStates.waiting_for_quality)
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("quality_"))
-async def edit_quality_handler(callback: CallbackQuery, state: FSMContext):
-    """Обработчик выбора качества"""
-    quality = callback.data.replace("quality_", "").upper()
-    
-    # Сохраняем выбранное качество
-    await state.update_data(edit_quality=quality)
-    
-    data = await state.get_data()
-    aspect_ratio = data.get("edit_aspect_ratio", "1:1")
-    aspect_name = "квадратное" if aspect_ratio == "1:1" else "вертикальное" if aspect_ratio == "9:16" else "горизонтальное"
-    
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
@@ -194,84 +170,91 @@ async def edit_quality_handler(callback: CallbackQuery, state: FSMContext):
     
     await callback.message.edit_text(
         f"<b>✨ Всё настроено!</b>\n\n"
-        f"<blockquote>📐 Соотношение: {aspect_name}\n"
-        f"🎨 Качество: {quality}</blockquote>\n\n"
+        f"<blockquote>📐 Соотношение: {aspect_name}</blockquote>\n\n"
         f"📷 Теперь <b><i>загрузите фото</i></b>, которое хотите отредактировать (можно до 8 фото)",
         parse_mode="HTML",
         reply_markup=keyboard
     )
+    
+    # Переходим к ожиданию фото (пропускаем выбор качества)
     await state.set_state(ImageEditingStates.waiting_for_photos)
     await callback.answer()
 
 
 @router.message(ImageEditingStates.waiting_for_photos, F.photo)
-async def process_edit_photos(message: Message, state: FSMContext, bot: Bot):
-    """Обработчик получения фотографий для редактирования"""
-    import asyncio
-    
+async def handle_edit_photos(message: Message, state: FSMContext, bot: Bot):
+    """Обработчик загрузки фото для редактирования"""
     user_id = message.from_user.id
     
     # Получаем URL фото
     photo = message.photo[-1]
     file = await bot.get_file(photo.file_id)
-    file_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
+    photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
     
-    # Если это медиа-группа
+    # Если это часть медиа-группы
     if message.media_group_id:
-        media_group_id = message.media_group_id
-        
-        # Инициализируем словари для пользователя
+        # Инициализируем список для этого пользователя, если его нет
         if user_id not in media_group_photos:
-            media_group_photos[user_id] = {}
-        if user_id not in processed_media_groups_edit:
-            processed_media_groups_edit[user_id] = set()
+            media_group_photos[user_id] = []
         
-        # Добавляем фото в словарь медиа-группы
-        if media_group_id not in media_group_photos[user_id]:
-            media_group_photos[user_id][media_group_id] = []
-        media_group_photos[user_id][media_group_id].append(file_url)
+        # Добавляем фото в список
+        media_group_photos[user_id].append(photo_url)
         
-        # Если группа уже обработана - просто выходим
-        if media_group_id in processed_media_groups_edit[user_id]:
+        # Проверяем, обрабатывали ли мы эту медиа-группу
+        if message.media_group_id in processed_media_groups_edit.get(user_id, set()):
             return
         
-        # Помечаем как обработанную
-        processed_media_groups_edit[user_id].add(media_group_id)
+        # Помечаем медиа-группу как обработанную
+        if user_id not in processed_media_groups_edit:
+            processed_media_groups_edit[user_id] = set()
+        processed_media_groups_edit[user_id].add(message.media_group_id)
         
-        # Ждём чтобы все фото пришли
-        await asyncio.sleep(1.0)
+        # Ждём немного, чтобы все фото из группы успели загрузиться
+        await asyncio.sleep(1)
         
-        # Получаем все фото из этой группы
-        all_photos = media_group_photos[user_id].get(media_group_id, [])
+        # Получаем все фото из медиа-группы
+        photos = media_group_photos.get(user_id, [])
         
-        # Сохраняем в состояние
-        await state.update_data(edit_photos=all_photos)
+        # Очищаем временное хранилище
+        if user_id in media_group_photos:
+            del media_group_photos[user_id]
         
-        # Удаляем из словаря
-        del media_group_photos[user_id][media_group_id]
-        
-        # Отправляем запрос на описание
-        await message.answer(
-            f"📝 Получено фото: {len(all_photos)}\n\n"
-            f"Теперь опишите, какие изменения хотите внести в изображение"
-        )
-        await state.set_state(ImageEditingStates.waiting_for_description)
     else:
         # Одиночное фото
-        await state.update_data(edit_photos=[file_url])
-        
-        await message.answer(
-            "📝 Опишите, какие изменения хотите внести в изображение"
-        )
-        await state.set_state(ImageEditingStates.waiting_for_description)
+        photos = [photo_url]
+    
+    # Сохраняем фото в состоянии
+    await state.update_data(edit_photos=photos)
+    
+    # Запрашиваем описание редактирования
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+    
+    await message.answer(
+        f"📷 Фото получено! ({len(photos)} шт.)\n\n"
+        f"✍️ Теперь <b><i>опишите</i></b>, как вы хотите отредактировать изображение:\n\n"
+        f"Примеры:\n"
+        f"• Улучшить качество и детализацию\n"
+        f"• Сделать фото ярче и контрастнее\n"
+        f"• Добавить винтажный эффект\n"
+        f"• Изменить фон на природу",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
+    
+    await state.set_state(ImageEditingStates.waiting_for_description)
 
 
 @router.message(ImageEditingStates.waiting_for_description, F.text)
 async def process_edit_description(message: Message, state: FSMContext, bot: Bot):
-    """Обработчик получения описания для редактирования"""
+    """Обработчик описания редактирования"""
     from database.database import Database
     from keyboards.inline import get_payment_methods_keyboard
     import json
+    import asyncio
     
     db = Database()
     user = db.get_user(message.from_user.id)
@@ -288,14 +271,13 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
         prompt = message.text
         action_data = json.dumps({
             "back_to": "image_editing",
-            "state_data": data,  # Сохраняем ВСЁ: соотношение, качество, фото
+            "state_data": data,  # Сохраняем ВСЁ: соотношение, фото
             "prompt": prompt
         })
         db.save_pending_action(message.from_user.id, "image_editing_pending", action_data)
         
         print(f"💾 Сохранено состояние для редактирования изображения:")
         print(f"   Aspect ratio: {data.get('edit_aspect_ratio')}")
-        print(f"   Quality: {data.get('edit_quality')}")
         print(f"   Photos: {len(data.get('edit_photos', []))} шт")
         print(f"   Prompt: {prompt}")
         
@@ -312,11 +294,10 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
     
     prompt = message.text
     aspect_ratio = data.get("edit_aspect_ratio", "1:1")
-    resolution = data.get("edit_quality", "1K")
     photos = data.get("edit_photos", [])
     
     logger.info(f"Получен промпт: {prompt}")
-    logger.info(f"Соотношение: {aspect_ratio}, Качество: {resolution}, Фото: {len(photos)}")
+    logger.info(f"Соотношение: {aspect_ratio}, Фото: {len(photos)}")
     
     # Отправляем сообщение о начале редактирования
     processing_msg = await message.answer(
@@ -324,12 +305,11 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
     )
     
     try:
-        # Создаём задачу на редактирование
+        # Создаём задачу на редактирование (используем nano-banana-edit API)
         task_id = await edit_client.create_edit_task(
             prompt=prompt,
             image_urls=photos,
-            aspect_ratio=aspect_ratio,
-            resolution=resolution,
+            image_size=aspect_ratio,  # ← ИЗМЕНЕНО: вместо aspect_ratio
             output_format="png"
         )
         
@@ -455,6 +435,13 @@ async def back_to_edit_aspect_handler(callback: CallbackQuery, state: FSMContext
     await callback.answer()
 
 
+@router.callback_query(F.data == "back_to_image_editing_menu")
+async def back_to_image_editing_menu_handler(callback: CallbackQuery, state: FSMContext):
+    """Обработчик кнопки 'Назад в меню редактирования'"""
+    await state.clear()
+    await image_editing_handler(callback)
+
+
 @router.callback_query(F.data == "video_instruction_editing")
 async def video_instruction_editing_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Видео-инструкция' в разделе редактирования"""
@@ -470,5 +457,21 @@ async def video_instruction_editing_handler(callback: CallbackQuery):
                 "Всего пару минут — и вы узнаете, как добиться качественного и эффектного результата ✨",
         parse_mode="HTML",
         reply_markup=keyboard
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "top_up_balance_editing")
+async def top_up_balance_editing_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Пополнить баланс' из раздела редактирования"""
+    from keyboards.inline import get_balance_amounts_keyboard
+    
+    # Сохраняем контекст
+    from handlers.payment import user_balance_context
+    user_balance_context[callback.from_user.id] = "image_editing"
+    
+    await callback.message.answer(
+        "💰 Выберите сумму для пополнения:",
+        reply_markup=get_balance_amounts_keyboard(back_to="image_editing")
     )
     await callback.answer()

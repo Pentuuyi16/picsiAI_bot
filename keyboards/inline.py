@@ -15,6 +15,7 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
     """Создаёт главное меню с инлайн-кнопками"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text="🔥 Тренды", callback_data="trends")],
             [InlineKeyboardButton(text="🕺 Управление движением(Kling)", callback_data="motion_control")],
             [
                 InlineKeyboardButton(text="📸 Оживление фото", callback_data="photo_animation"),
@@ -207,6 +208,49 @@ def get_motion_quality_keyboard():
                 InlineKeyboardButton(text="1080p", callback_data="motion_quality_1080p")
             ],
             [InlineKeyboardButton(text="Назад", callback_data="motion_control")]
+        ]
+    )
+    return keyboard
+
+def get_trends_keyboard(page: int = 1) -> InlineKeyboardMarkup:
+    """Создаёт клавиатуру для раздела 'Тренды'"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Фотки с макбука", callback_data="trend_macbook"),
+                InlineKeyboardButton(text="Именной букет", callback_data="trend_bouquet")
+            ],
+            [
+                InlineKeyboardButton(text="Снежный ангел", callback_data="trend_snow_angel"),
+                InlineKeyboardButton(text="Фотка на сноуборде", callback_data="trend_snowboard")
+            ],
+            [
+                InlineKeyboardButton(text="Портрет на стене", callback_data="trend_wall_portrait"),
+                InlineKeyboardButton(text="Влюбленный взгляд", callback_data="trend_loving_gaze")
+            ],
+            [
+                InlineKeyboardButton(text="Фотка с мечами", callback_data="trend_swords"),
+                InlineKeyboardButton(text="Сердце на здание", callback_data="trend_heart_building")
+            ],
+            [
+                InlineKeyboardButton(text="Фотка в машине", callback_data="trend_car"),
+                InlineKeyboardButton(text="Фотка с криком", callback_data="trend_scream")
+            ],
+            [InlineKeyboardButton(text="Следующая страница →", callback_data="trends_page_2")],
+            [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="top_up_balance_trends")],  # ← ДОБАВИТЬ ЭТУ СТРОКУ
+            [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
+        ]
+    )
+    return keyboard
+
+def get_trend_aspect_ratio_keyboard() -> InlineKeyboardMarkup:
+    """Создаёт клавиатуру для выбора соотношения сторон для трендов"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="16:9 Горизонтальное", callback_data="trend_aspect_16_9")],
+            [InlineKeyboardButton(text="9:16 Вертикальное", callback_data="trend_aspect_9_16")],
+            [InlineKeyboardButton(text="1:1 Квадратное", callback_data="trend_aspect_1_1")],
+            [InlineKeyboardButton(text="Отмена", callback_data="trends")]
         ]
     )
     return keyboard

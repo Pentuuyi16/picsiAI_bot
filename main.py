@@ -5,6 +5,7 @@ from aiogram.types import BotCommand, Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
 from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support, motion_control
+from handlers.trends import router as trends_router
 from webhook_server import start_webhook_server
 
 # Настройка логирования
@@ -43,13 +44,14 @@ async def main():
     dp.include_router(referral.router)
     dp.include_router(cabinet.router)
     dp.include_router(support.router)
-        
+    dp.include_router(trends_router) 
     logger.info("🚀 Бот запущен")
     
     # Запускаем webhook сервер
     webhook_runner = await start_webhook_server(bot, host='127.0.0.1', port=8080)
     logger.info("✅ Webhook сервер запущен на 127.0.0.1:8080")
-    
+
+
     # Запускаем polling
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
