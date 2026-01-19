@@ -74,6 +74,7 @@ async def process_scream_photo(message: Message, state: FSMContext, bot):
 async def process_scream_aspect(callback: CallbackQuery, state: FSMContext, bot):
     from utils.nano_banana_edit_client import NanoBananaEditClient
     from aiogram.types import URLInputFile
+    from database.database import Database
     
     aspect_map = {
         "trend_aspect_16_9": "16:9",
@@ -92,6 +93,32 @@ async def process_scream_aspect(callback: CallbackQuery, state: FSMContext, bot)
         return
     
     user_id = callback.from_user.id
+    
+    # ========== ПРОВЕРКА ГЕНЕРАЦИЙ ==========
+    db = Database()
+    generations = db.get_user_generations(user_id)
+    
+    if generations < 1:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            ]
+        )
+        
+        await callback.message.answer(
+            "У вас закончились генерации 😔\n\n"
+            f"<blockquote>⚡ Доступно: {generations} генераций\n"
+            f"🎨 Один тренд = 1 генерация</blockquote>\n\n"
+            "Купите пакет генераций, чтобы продолжить!",
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.clear()
+        await callback.answer()
+        return
+    # ========================================
+    
     print(f"🎨 User {user_id} - Selected aspect ratio: {aspect_ratio}")
     
     processing_msg = await callback.message.answer(
@@ -127,9 +154,14 @@ async def process_scream_aspect(callback: CallbackQuery, state: FSMContext, bot)
                     "Частые причины:\n"
                     "• На фото известная личность\n"
                     "• Неподходящий контент\n\n"
-                    "💡 Совет: используйте обычные фотографии"
+                    "💡 Совет: используйте обычные фотографии\n\n"
+                    "💛 Не переживайте, генерация не списана"
                 )
             else:
+                # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
+                db.subtract_generations(user_id, 1)
+                # ========================================
+                
                 print(f"✅ Generation successful! Result URL: {result_url}")
                 
                 try:
@@ -143,6 +175,8 @@ async def process_scream_aspect(callback: CallbackQuery, state: FSMContext, bot)
                     await processing_msg.delete()
                     
                     print(f"✅ Photo sent successfully!")
+                    
+                    db.save_generation(user_id, "trend_scream", result_url, SCREAM_PROMPT)
                     
                     from keyboards.inline import get_trends_keyboard
                     await callback.message.answer(
@@ -161,7 +195,8 @@ async def process_scream_aspect(callback: CallbackQuery, state: FSMContext, bot)
                 "Не удалось отредактировать фото. Возможные причины:\n"
                 "• Превышено время ожидания\n"
                 "• Временные проблемы с сервером\n\n"
-                "💡 Попробуйте ещё раз через пару минут"
+                "💡 Попробуйте ещё раз через пару минут\n\n"
+                "💛 Не переживайте, генерация не списана"
             )
     
     except Exception as e:

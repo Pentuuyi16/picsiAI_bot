@@ -183,8 +183,10 @@ async def process_macbook_aspect(callback: CallbackQuery, state: FSMContext, bot
                     db.save_generation(user_id, "trend_macbook", result_url, MACBOOK_PROMPT)
 
                     from keyboards.inline import get_trends_keyboard
+                    generations = db.get_user_generations(user_id)
                     await callback.message.answer(
                         "Выберите тренд, который лучше всего вам подходит 💫",
+                        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
                         reply_markup=get_trends_keyboard(page=1)
                     )
                     

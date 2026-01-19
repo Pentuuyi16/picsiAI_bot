@@ -19,7 +19,7 @@ BOUQUET_PROMPT_TEMPLATE = (
 class BouquetStates(StatesGroup):
     waiting_for_photo = State()
     waiting_for_name = State()
-    waiting_for_aspect = State()  # ← НОВОЕ СОСТОЯНИЕ
+    waiting_for_aspect = State()
 
 
 @router.callback_query(F.data == "trend_bouquet")
@@ -79,15 +79,12 @@ async def process_bouquet_photo(message: Message, state: FSMContext, bot):
 
 @router.message(BouquetStates.waiting_for_name, F.text)
 async def process_bouquet_name(message: Message, state: FSMContext):
-    """Обработчик имени - сохраняет и просит выбрать соотношение"""
     user_name = message.text.strip()
     
     print(f"🎨 User {message.from_user.id} - Name: {user_name}")
     
-    # Сохраняем имя
     await state.update_data(user_name=user_name)
     
-    # Просим выбрать соотношение сторон
     from keyboards.inline import get_trend_aspect_ratio_keyboard
     
     await message.answer(
@@ -101,9 +98,9 @@ async def process_bouquet_name(message: Message, state: FSMContext):
 
 @router.callback_query(BouquetStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
 async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext, bot):
-    """Обработчик выбора соотношения сторон"""
     from utils.nano_banana_edit_client import NanoBananaEditClient
     from aiogram.types import URLInputFile
+    from database.database import Database
     
     aspect_map = {
         "trend_aspect_16_9": "16:9",
@@ -113,7 +110,6 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext, bot
     
     aspect_ratio = aspect_map[callback.data]
     
-    # Получаем сохраненные данные
     data = await state.get_data()
     photo_url = data.get("photo_url")
     user_name = data.get("user_name")
@@ -124,9 +120,34 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext, bot
         return
     
     user_id = callback.from_user.id
+    
+    # ========== ПРОВЕРКА ГЕНЕРАЦИЙ ==========
+    db = Database()
+    generations = db.get_user_generations(user_id)
+    
+    if generations < 1:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            ]
+        )
+        
+        await callback.message.answer(
+            "У вас закончились генерации 😔\n\n"
+            f"<blockquote>⚡ Доступно: {generations} генераций\n"
+            f"🎨 Один тренд = 1 генерация</blockquote>\n\n"
+            "Купите пакет генераций, чтобы продолжить!",
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.clear()
+        await callback.answer()
+        return
+    # ========================================
+    
     print(f"🎨 User {user_id} - Selected aspect ratio: {aspect_ratio}")
     
-    # Формируем промпт
     name_upper = user_name.upper()
     name_letters = ", ".join([f'"{letter}"' for letter in name_upper])
     final_prompt = BOUQUET_PROMPT_TEMPLATE.format(name_letters=name_letters)
@@ -143,7 +164,7 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext, bot
         task_id = await edit_client.create_edit_task(
             prompt=final_prompt,
             image_urls=[photo_url],
-            image_size=aspect_ratio,  # ← ИСПОЛЬЗУЕМ ВЫБРАННОЕ СООТНОШЕНИЕ
+            image_size=aspect_ratio,
             output_format="png"
         )
         
@@ -166,9 +187,14 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext, bot
                     "Частые причины:\n"
                     "• На фото известная личность\n"
                     "• Неподходящий контент\n\n"
-                    "💡 Совет: используйте обычные фотографии"
+                    "💡 Совет: используйте обычные фотографии\n\n"
+                    "💛 Не переживайте, генерация не списана"
                 )
             else:
+                # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
+                db.subtract_generations(user_id, 1)
+                # ========================================
+                
                 print(f"✅ Generation successful! Result URL: {result_url}")
                 
                 try:
@@ -183,9 +209,13 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext, bot
                     
                     print(f"✅ Photo sent successfully!")
                     
+                    db.save_generation(user_id, "trend_bouquet", result_url, final_prompt)
+                    
                     from keyboards.inline import get_trends_keyboard
+                    generations = db.get_user_generations(user_id)
                     await callback.message.answer(
                         "Выберите тренд, который лучше всего вам подходит 💫",
+                        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
                         reply_markup=get_trends_keyboard(page=1)
                     )
                     
@@ -200,7 +230,8 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext, bot
                 "Не удалось отредактировать фото. Возможные причины:\n"
                 "• Превышено время ожидания\n"
                 "• Временные проблемы с сервером\n\n"
-                "💡 Попробуйте ещё раз через пару минут"
+                "💡 Попробуйте ещё раз через пару минут\n\n"
+                "💛 Не переживайте, генерация не списана"
             )
     
     except Exception as e:

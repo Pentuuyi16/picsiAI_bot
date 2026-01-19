@@ -5,10 +5,8 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-# File ID фотографии примера
 PHOTO_FILE_ID = "AgACAgIAAxkBAAIN9mluoS85_tjYEoGIYuAWOQGDw1G8AAIBFWsbSD9wS_w_3PPNn4KLAQADAgADeQADOAQ"
 
-# Готовый промпт для редактирования
 SNOWBOARD_PROMPT = (
     "A hyper-realistic night-time iPhone flash photo on the summit of a snowy mountain. "
     "A woman stands full body in the foreground, holding a snowboard, wearing a snow Red Bull helmet "
@@ -22,15 +20,12 @@ SNOWBOARD_PROMPT = (
 
 
 class SnowboardStates(StatesGroup):
-    """Состояния для тренда Фотка на сноуборде"""
     waiting_for_photo = State()
     waiting_for_aspect = State()
 
 
 @router.callback_query(F.data == "trend_snowboard")
 async def trend_snowboard_handler(callback: CallbackQuery, state: FSMContext):
-    """Обработчик тренда 'Фотка на сноуборде'"""
-    
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Назад", callback_data="trends")]
@@ -58,7 +53,6 @@ async def trend_snowboard_handler(callback: CallbackQuery, state: FSMContext):
 
 @router.message(SnowboardStates.waiting_for_photo, F.photo)
 async def process_snowboard_photo(message: Message, state: FSMContext, bot):
-    """Обработчик фото - сохраняет и просит выбрать соотношение"""
     user_id = message.from_user.id
     
     photo = message.photo[-1]
@@ -67,10 +61,8 @@ async def process_snowboard_photo(message: Message, state: FSMContext, bot):
     
     print(f"🎨 User {user_id} - Snowboard trend photo: {photo_url}")
     
-    # Сохраняем URL фото
     await state.update_data(photo_url=photo_url)
     
-    # Просим выбрать соотношение сторон
     from keyboards.inline import get_trend_aspect_ratio_keyboard
     
     await message.answer(
@@ -84,11 +76,10 @@ async def process_snowboard_photo(message: Message, state: FSMContext, bot):
 
 @router.callback_query(SnowboardStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
 async def process_snowboard_aspect(callback: CallbackQuery, state: FSMContext, bot):
-    """Обработчик выбора соотношения сторон"""
     from utils.nano_banana_edit_client import NanoBananaEditClient
     from aiogram.types import URLInputFile
+    from database.database import Database
     
-    # Определяем соотношение
     aspect_map = {
         "trend_aspect_16_9": "16:9",
         "trend_aspect_9_16": "9:16",
@@ -97,7 +88,6 @@ async def process_snowboard_aspect(callback: CallbackQuery, state: FSMContext, b
     
     aspect_ratio = aspect_map[callback.data]
     
-    # Получаем сохраненные данные
     data = await state.get_data()
     photo_url = data.get("photo_url")
     
@@ -107,6 +97,32 @@ async def process_snowboard_aspect(callback: CallbackQuery, state: FSMContext, b
         return
     
     user_id = callback.from_user.id
+    
+    # ========== ПРОВЕРКА ГЕНЕРАЦИЙ ==========
+    db = Database()
+    generations = db.get_user_generations(user_id)
+    
+    if generations < 1:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            ]
+        )
+        
+        await callback.message.answer(
+            "У вас закончились генерации 😔\n\n"
+            f"<blockquote>⚡ Доступно: {generations} генераций\n"
+            f"🎨 Один тренд = 1 генерация</blockquote>\n\n"
+            "Купите пакет генераций, чтобы продолжить!",
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.clear()
+        await callback.answer()
+        return
+    # ========================================
+    
     print(f"🎨 User {user_id} - Selected aspect ratio: {aspect_ratio}")
     
     processing_msg = await callback.message.answer(
@@ -142,9 +158,14 @@ async def process_snowboard_aspect(callback: CallbackQuery, state: FSMContext, b
                     "Частые причины:\n"
                     "• На фото известная личность\n"
                     "• Неподходящий контент\n\n"
-                    "💡 Совет: используйте обычные фотографии"
+                    "💡 Совет: используйте обычные фотографии\n\n"
+                    "💛 Не переживайте, генерация не списана"
                 )
             else:
+                # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
+                db.subtract_generations(user_id, 1)
+                # ========================================
+                
                 print(f"✅ Generation successful! Result URL: {result_url}")
                 
                 try:
@@ -159,10 +180,13 @@ async def process_snowboard_aspect(callback: CallbackQuery, state: FSMContext, b
                     
                     print(f"✅ Photo sent successfully!")
                     
-                    # Возвращаем в меню трендов
+                    db.save_generation(user_id, "trend_snowboard", result_url, SNOWBOARD_PROMPT)
+                    
                     from keyboards.inline import get_trends_keyboard
+                    generations = db.get_user_generations(user_id)
                     await callback.message.answer(
                         "Выберите тренд, который лучше всего вам подходит 💫",
+                        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
                         reply_markup=get_trends_keyboard(page=1)
                     )
                     
@@ -177,7 +201,8 @@ async def process_snowboard_aspect(callback: CallbackQuery, state: FSMContext, b
                 "Не удалось отредактировать фото. Возможные причины:\n"
                 "• Превышено время ожидания\n"
                 "• Временные проблемы с сервером\n\n"
-                "💡 Попробуйте ещё раз через пару минут"
+                "💡 Попробуйте ещё раз через пару минут\n\n"
+                "💛 Не переживайте, генерация не списана"
             )
     
     except Exception as e:
