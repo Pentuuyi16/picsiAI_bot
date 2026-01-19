@@ -8,20 +8,25 @@ router = Router()
 
 @router.callback_query(F.data == "trends")
 async def trends_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Тренды'"""
     user_id = callback.from_user.id
+    
+    # Получаем количество генераций
     db = Database()
     generations = db.get_user_generations(user_id)
-    
-    try:
-        await callback.message.delete()
-    except:
-        pass
     
     generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
     if generations == 1:
         generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
     generation_text += "</blockquote>"
     
+    # Удаляем старое сообщение
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    
+    # Отправляем новое
     await callback.message.answer(
         f"Выберите тренд, который лучше всего вам подходит 💫\n\n"
         f"{generation_text}",

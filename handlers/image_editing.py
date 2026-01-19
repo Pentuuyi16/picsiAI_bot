@@ -102,7 +102,7 @@ async def compress_image(image_url: str, max_size_mb: float = 10.0, quality: int
 
 @router.callback_query(F.data == "image_editing")
 async def image_editing_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Редактирование изображений'"""
+    """Обработчик кнопки 'Редактирование изображений'"""    
     from database.database import Database
     
     user_id = callback.from_user.id

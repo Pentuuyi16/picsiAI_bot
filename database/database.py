@@ -12,10 +12,10 @@ class Database:
         self.create_tables()
         self.create_generations_table()
         self.update_users_table_for_referrals()
-        self.update_users_table_for_generations()  # ← НОВОЕ
+        self.update_users_table_for_generations()
         self.create_referral_earnings_table()
         self.create_payments_table()
-        self.create_generation_purchases_table()  # ← НОВОЕ
+        self.create_generation_purchases_table()
     
     def create_tables(self):
         """Создаёт необходимые таблицы, если они не существуют"""
@@ -53,11 +53,18 @@ class Database:
     
         if 'generations' not in columns:
             try:
-                self.cursor.execute('ALTER TABLE users ADD COLUMN generations INTEGER DEFAULT 0')
+                self.cursor.execute('ALTER TABLE users ADD COLUMN generations INTEGER DEFAULT 1')
                 self.conn.commit()
                 print("✅ Добавлено поле generations в таблицу users")
             except Exception as e:
                 print(f"⚠️ Ошибка добавления поля generations: {e}")
+        else:
+            # Обновляем генерации для старых пользователей с 0 генераций
+            self.cursor.execute('UPDATE users SET generations = 1 WHERE generations = 0')
+            updated_count = self.cursor.rowcount
+            self.conn.commit()
+            if updated_count > 0:
+                print(f"✅ Обновлено {updated_count} пользователей: добавлена 1 бесплатная генерация")
     
     def create_generation_purchases_table(self):
         """Создаёт таблицу для хранения покупок генераций"""
@@ -169,7 +176,7 @@ class Database:
         """Сохраняет платёж в БД"""
         self.cursor.execute('''
             INSERT INTO payments (payment_id, user_id, amount, status)
-            VALUES (?, ?, ?, 'pending')
+            VALUES (?, ?, ?, ?, 'pending')
         ''', (payment_id, user_id, amount))
         self.conn.commit()
         print(f"💾 Платёж сохранён: payment_id={payment_id}, user_id={user_id}, amount={amount}")
@@ -341,11 +348,11 @@ class Database:
         return self.cursor.fetchall()
     
     def add_user(self, user_id: int, username: str = None, first_name: str = None, 
-             last_name: str = None):
+                 last_name: str = None):
         """Добавляет нового пользователя в базу данных"""
         self.cursor.execute('''
             INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, balance, generations)
-            VALUES (?, ?, ?, ?, 0.0, 0)
+            VALUES (?, ?, ?, ?, 0.0, 1)
         ''', (user_id, username, first_name, last_name))
         self.conn.commit()
     
