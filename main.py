@@ -17,6 +17,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Временный обработчик для получения file_id фото
+async def get_photo_file_id(message: Message):
+    """Временный обработчик для получения file_id фотографий"""
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        await message.reply(
+            f"📷 <b>File ID фото:</b>\n\n"
+            f"<code>{file_id}</code>\n\n"
+            f"Скопируй этот ID для использования в боте!",
+            parse_mode="HTML"
+        )
+
+
 async def main():
     """Главная функция запуска бота"""
     # Создаём бота и диспетчер
@@ -26,10 +39,10 @@ async def main():
     
     # Настраиваем команды бота (меню)
     commands = [
-        BotCommand(command="menu", description="Главное меню"),
-        BotCommand(command="pay", description="Пополнить счёт"),
-        BotCommand(command="lk", description="Личный кабинет"),
-        BotCommand(command="help", description="Поддержка")
+        BotCommand(command="menu", description="🏠 Главное меню"),
+        BotCommand(command="pay", description="💳 Пополнить счёт"),
+        BotCommand(command="lk", description="👤 Личный кабинет"),
+        BotCommand(command="help", description="💬 Поддержка")
     ]
     await bot.set_my_commands(commands)
     logger.info("✅ Команды бота настроены")
@@ -46,12 +59,15 @@ async def main():
     dp.include_router(support.router)
     dp.include_router(trends_router)
     dp.include_router(generation_purchase.router)
+    
+    # Временный обработчик для получения file_id (регистрируем в самом конце)
+    dp.message.register(get_photo_file_id, F.photo)
+    
     logger.info("🚀 Бот запущен")
     
     # Запускаем webhook сервер
     webhook_runner = await start_webhook_server(bot, host='127.0.0.1', port=8080)
     logger.info("✅ Webhook сервер запущен на 127.0.0.1:8080")
-
 
 
     # Запускаем polling
