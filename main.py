@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F, Router
+from aiogram import Bot, Dispatcher, F
 from aiogram.types import BotCommand, Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
@@ -15,7 +15,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 
 async def main():
@@ -47,17 +46,11 @@ async def main():
     dp.include_router(support.router)
     dp.include_router(trends_router)
     dp.include_router(generation_purchase.router)
-    
-    # ВРЕМЕННО: Подключаем обработчик для получения file_id
-    dp.include_router(temp_router)
-    logger.info("⚠️ ВРЕМЕННЫЙ обработчик file_id подключен")
-    
     logger.info("🚀 Бот запущен")
     
     # Запускаем webhook сервер
     webhook_runner = await start_webhook_server(bot, host='127.0.0.1', port=8080)
     logger.info("✅ Webhook сервер запущен на 127.0.0.1:8080")
-
 
 
     # Запускаем polling
@@ -67,9 +60,9 @@ async def main():
         await webhook_runner.cleanup()
         await bot.session.close()
 
-
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("⛔ Бот остановлен")
+
