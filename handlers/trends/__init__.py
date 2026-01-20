@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from database.database import Database
 from keyboards.inline import get_trends_keyboard
 from .handler import router as handler_router
@@ -53,5 +53,28 @@ async def trends_handler(callback: CallbackQuery):
         f"{generation_text}",
         parse_mode="HTML",
         reply_markup=get_trends_keyboard(page=1)
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == "trends_page_2")
+async def trends_page_2_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Следующая страница' в трендах"""
+    from keyboards.inline import get_trends_keyboard
+    
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    
+    await callback.message.answer(
+        "<b>🚧 Раздел находится в активной разработке</b>\n\n"
+        "💡 Есть идея для нового тренда? Напишите нам — возможно именно она станет следующей фишкой ⤵️\n"
+        "https://t.me/PicsiSupport",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Назад", callback_data="trends")]
+            ]
+        )
     )
     await callback.answer()
