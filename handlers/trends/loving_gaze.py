@@ -18,6 +18,7 @@ LOVING_GAZE_PROMPT = (
 class LovingGazeStates(StatesGroup):
     waiting_for_photo = State()
     waiting_for_aspect = State()
+    waiting_for_model = State()
 
 
 @router.callback_query(F.data == "trend_loving_gaze")
@@ -71,9 +72,7 @@ async def process_loving_gaze_photo(message: Message, state: FSMContext, bot):
 
 
 @router.callback_query(LovingGazeStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
-async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext, bot):
-    from utils.nano_banana_edit_client import NanoBananaEditClient
-    from aiogram.types import URLInputFile
+async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext):
     from database.database import Database
     
     aspect_map = {
@@ -83,11 +82,49 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext,
     }
     
     aspect_ratio = aspect_map[callback.data]
+    await state.update_data(aspect_ratio=aspect_ratio)
+    
+    user_id = callback.from_user.id
+    db = Database()
+    generations = db.get_user_generations(user_id)
+    
+    from keyboards.inline import get_trend_model_selection_keyboard
+    
+    await callback.message.answer(
+        "<b>🤖 Выбор модели генерации</b>\n\n"
+        "<b>Активная модель: Стандартная</b>\n\n"
+        "<b>🌟 Стандартная (Nano Banana)</b>\n"
+        "• Цена: <b><i>1 генерация</i></b>\n"
+        "• Качество: <b><i>стабильно хорошее</i></b>\n"
+        "• Скорость: <b><i>молниеносная ⚡</i></b>\n\n"
+        "<b>🚀 Профессиональная (Nano Banana Pro)</b>\n"
+        "• Цена: <b><i>4 генерации</i></b>\n"
+        "• Разрешение: <b><i>ультра-чёткое 4K</i></b>\n"
+        "• Качество: <b><i>максимальный уровень детализации</i></b>\n"
+        "• Промты до <b><i>5000 символов</i></b>\n"
+        "• <b><i>Продвинутое понимание текста</i></b> для точных результатов\n\n"
+        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
+        parse_mode="HTML",
+        reply_markup=get_trend_model_selection_keyboard(generations)
+    )
+    
+    await state.set_state(LovingGazeStates.waiting_for_model)
+    await callback.answer()
+
+
+@router.callback_query(LovingGazeStates.waiting_for_model, F.data.in_(["trend_model_standard", "trend_model_pro"]))
+async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, bot):
+    from database.database import Database
+    from aiogram.types import URLInputFile
+    
+    model_type = "standard" if callback.data == "trend_model_standard" else "pro"
+    generations_cost = 1 if model_type == "standard" else 4
     
     data = await state.get_data()
     photo_url = data.get("photo_url")
+    aspect_ratio = data.get("aspect_ratio")
     
-    if not photo_url:
+    if not photo_url or not aspect_ratio:
         await callback.message.answer("❌ Ошибка: фото не найдено. Попробуйте заново.")
         await state.clear()
         return
@@ -98,7 +135,7 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext,
     db = Database()
     generations = db.get_user_generations(user_id)
     
-    if generations < 1:
+    if generations < generations_cost:
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
@@ -109,7 +146,7 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext,
         await callback.message.answer(
             "У вас закончились генерации 😔\n\n"
             f"<blockquote>⚡ Доступно: {generations} генераций\n"
-            f"🎨 Один тренд = 1 генерация</blockquote>\n\n"
+            f"🎨 Выбранная модель требует: {generations_cost} генерации</blockquote>\n\n"
             "Купите пакет генераций, чтобы продолжить!",
             parse_mode="HTML",
             reply_markup=keyboard
@@ -119,21 +156,34 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext,
         return
     # ========================================
     
-    print(f"🎨 User {user_id} - Selected aspect ratio: {aspect_ratio}")
+    print(f"🎨 User {user_id} - Selected model: {model_type}, aspect ratio: {aspect_ratio}")
     
     processing_msg = await callback.message.answer(
         "⭐ Начинается редактирование, пожалуйста подождите..."
     )
     
     try:
-        edit_client = NanoBananaEditClient()
-        
-        task_id = await edit_client.create_edit_task(
-            prompt=LOVING_GAZE_PROMPT,
-            image_urls=[photo_url],
-            image_size=aspect_ratio,
-            output_format="png"
-        )
+        if model_type == "standard":
+            from utils.nano_banana_edit_client import NanoBananaEditClient
+            edit_client = NanoBananaEditClient()
+            
+            task_id = await edit_client.create_edit_task(
+                prompt=LOVING_GAZE_PROMPT,
+                image_urls=[photo_url],
+                image_size=aspect_ratio,
+                output_format="png"
+            )
+        else:
+            from utils.image_edit_client import ImageEditClient
+            edit_client = ImageEditClient()
+            
+            task_id = await edit_client.create_edit_task(
+                prompt=LOVING_GAZE_PROMPT,
+                image_urls=[photo_url],
+                aspect_ratio=aspect_ratio,
+                resolution="4K",
+                output_format="png"
+            )
         
         if not task_id:
             await processing_msg.edit_text(
@@ -159,7 +209,7 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext,
                 )
             else:
                 # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
-                db.subtract_generations(user_id, 1)
+                db.subtract_generations(user_id, generations_cost)
                 # ========================================
                 
                 print(f"✅ Generation successful! Result URL: {result_url}")

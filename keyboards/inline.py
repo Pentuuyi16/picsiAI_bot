@@ -238,7 +238,7 @@ def get_trends_keyboard(page: int = 1) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Фотка с криком", callback_data="trend_scream")
             ],
             [InlineKeyboardButton(text="Следующая страница →", callback_data="trends_page_2")],
-            [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],  # ← ДОБАВИТЬ ЭТУ СТРОКУ
+            [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
             [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
         ]
     )
@@ -252,6 +252,16 @@ def get_trend_aspect_ratio_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="9:16 Вертикальное", callback_data="trend_aspect_9_16")],
             [InlineKeyboardButton(text="1:1 Квадратное", callback_data="trend_aspect_1_1")],
             [InlineKeyboardButton(text="Отмена", callback_data="trends")]
+        ]
+    )
+    return keyboard
+
+def get_trend_model_selection_keyboard(generations: int) -> InlineKeyboardMarkup:
+    """Создаёт клавиатуру для выбора модели генерации в трендах"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🌟 Стандартная", callback_data="trend_model_standard")],
+            [InlineKeyboardButton(text="🚀 Профессиональная", callback_data="trend_model_pro")]
         ]
     )
     return keyboard
