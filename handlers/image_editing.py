@@ -22,7 +22,7 @@ edit_client = NanoBananaEditClient()
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIBpmlj6MWT1noxhNkndG0sdWbLGN59AAIkjwACRLMgSw85wE6If6H5OAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAEK9l9pb1p-JbaXxDjCljcxz4ZEQ9JjzgACTIwAAuV4eUuE9B7VbY-WeDgE"
 
 
 # Временное хранилище для обработанных медиа-групп (по user_id)
