@@ -149,6 +149,12 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
     # ВАЖНО: Сразу отвечаем на callback чтобы он не устарел
     await callback.answer()
     
+    # Удаляем сообщение с выбором модели
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    
     model_type = "standard" if callback.data == "trend_model_standard" else "pro"
     generations_cost = 1 if model_type == "standard" else 4
     
