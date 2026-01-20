@@ -186,7 +186,7 @@ async def process_heart_building_aspect(callback: CallbackQuery, state: FSMConte
                     generations = db.get_user_generations(user_id)
                     
                     generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
-                    if generations == 1:
+                    if generations == 1 and not db.has_purchased_generations(user_id):
                         generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
                     generation_text += "</blockquote>"
                     

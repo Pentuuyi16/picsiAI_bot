@@ -149,6 +149,16 @@ class Database:
         user = self.get_user(user_id)
         return user.get('generations', 0) if user else 0
     
+
+    def has_purchased_generations(self, user_id: int) -> bool:
+        """Проверяет, покупал ли пользователь генерации"""
+        self.cursor.execute('''
+            SELECT COUNT(*) FROM generation_purchases 
+            WHERE user_id = ? AND status = 'succeeded'
+        ''', (user_id,))
+        count = self.cursor.fetchone()[0]
+        return count > 0
+
     def create_payments_table(self):
         """Создаёт таблицу для хранения платежей"""
         self.cursor.execute('''
