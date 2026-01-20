@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.types import BotCommand, Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
@@ -16,6 +16,32 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# ========== ВРЕМЕННЫЙ РОУТЕР ДЛЯ ПОЛУЧЕНИЯ FILE_ID ==========
+temp_router = Router()
+
+@temp_router.message(F.photo)
+async def get_photo_file_id(message: Message):
+    """Временный обработчик для получения file_id фото"""
+    photo = message.photo[-1]  # Берём фото максимального размера
+    await message.reply(
+        f"📸 <b>FILE_ID фото:</b>\n"
+        f"<code>{photo.file_id}</code>\n\n"
+        f"Размер: {photo.width}x{photo.height}",
+        parse_mode="HTML"
+    )
+
+@temp_router.message(F.video)
+async def get_video_file_id(message: Message):
+    """Временный обработчик для получения file_id видео"""
+    video = message.video
+    await message.reply(
+        f"🎥 <b>FILE_ID видео:</b>\n"
+        f"<code>{video.file_id}</code>\n\n"
+        f"Размер: {video.width}x{video.height}\n"
+        f"Длительность: {video.duration}с",
+        parse_mode="HTML"
+    )
+# ============================================================
 
 
 async def main():
@@ -47,6 +73,11 @@ async def main():
     dp.include_router(support.router)
     dp.include_router(trends_router)
     dp.include_router(generation_purchase.router)
+    
+    # ВРЕМЕННО: Подключаем обработчик для получения file_id
+    dp.include_router(temp_router)
+    logger.info("⚠️ ВРЕМЕННЫЙ обработчик file_id подключен")
+    
     logger.info("🚀 Бот запущен")
     
     # Запускаем webhook сервер
