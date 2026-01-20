@@ -1,9 +1,12 @@
-from aiogram import Router
+from aiogram import Router, F
+from aiogram.types import CallbackQuery
+from database.database import Database
+from keyboards.inline import get_trends_keyboard
 from .handler import router as handler_router
 from .macbook import router as macbook_router
 from .bouquet import router as bouquet_router
 from .snow_angel import router as snow_angel_router
-from .snowboard import router as snowboard_router  # ← ИЗМЕНЕНО
+from .snowboard import router as snowboard_router
 from .wall_portrait import router as wall_portrait_router
 from .loving_gaze import router as loving_gaze_router
 from .swords import router as swords_router
@@ -19,13 +22,14 @@ router.include_router(handler_router)
 router.include_router(macbook_router)
 router.include_router(bouquet_router)
 router.include_router(snow_angel_router)
-router.include_router(snowboard_router)  # ← ИЗМЕНЕНО
+router.include_router(snowboard_router)
 router.include_router(wall_portrait_router)
 router.include_router(loving_gaze_router)
 router.include_router(swords_router)
 router.include_router(heart_building_router)
 router.include_router(car_router)
 router.include_router(scream_router)
+
 
 @router.callback_query(F.data == "trends")
 async def trends_handler(callback: CallbackQuery):
