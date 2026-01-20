@@ -5,27 +5,34 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIN8mluoRkvRL--TTE1ow1KOomYDopYAAMVaxtIP3BLBSpumdGpsNEBAAMCAAN5AAM4BA"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIOGmluokFN3Ojk5DfeepD-ZVVYb7HhAAItFWsbSD9wS6-RY6BVyNO0AQADAgADeQADOAQ"
 
-HEART_BUILDING_PROMPT = (
-    "Create a realistic photo without changing your face. "
-    "The photo is taken against the backdrop of a building. "
-    "The image is done in an urban aesthetic style. "
-    "The model, a girl in dark, loose clothing, stands in a snowy wasteland. "
-    "A modern multi-story building towers in the background. "
-    "The main detail is the building's windows, illuminated with a bright pink light "
-    "so that they form the outline of a huge heart. "
-    "The photo conveys a melancholic, romantic urban mood"
+SWORDS_PROMPT = (
+    "Grassy hill covered with short wild grass, flat gray overcast sky, soft dramatic clouds, "
+    "heavy cinematic atmosphere. Three-quarter side low-angle shot, slightly rotated perspective "
+    "for dynamic composition. Dozens of giant matte metal swords planted vertically across the hill, "
+    "creating an epic battlefield memorial scene, some close, some fading into the foggy distance. "
+    "One massive sword directly behind the woman, towering above her. "
+    "Woman sitting on the slope with her back resting against the giant sword, knees slightly bent, "
+    "legs angled downhill. One arm resting on her knee, the other touching the grass for balance. "
+    "Head slightly tilted and turned sideways, calm but powerful expression. "
+    "Long dark hair blown backward by wind, strong motion flow. "
+    "Light translucent veil trailing behind, flowing in the wind. "
+    "Warm ivory structured dress, matte fabric, elegant heroic silhouette. "
+    "Cinematic lighting, soft contrast, subtle rim light outlining the figure. "
+    "Depth of field with foreground focus, background softly blurred. "
+    "Ultra realistic film still look, near-RAW photo style, slightly warm cinematic color grading, "
+    "high dynamic range."
 )
 
 
-class HeartBuildingStates(StatesGroup):
+class SwordsStates(StatesGroup):
     waiting_for_photo = State()
     waiting_for_aspect = State()
 
 
-@router.callback_query(F.data == "trend_heart_building")
-async def trend_heart_building_handler(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == "trend_swords")
+async def trend_swords_handler(callback: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Назад", callback_data="trends")]
@@ -47,19 +54,19 @@ async def trend_heart_building_handler(callback: CallbackQuery, state: FSMContex
         reply_markup=keyboard
     )
     
-    await state.set_state(HeartBuildingStates.waiting_for_photo)
+    await state.set_state(SwordsStates.waiting_for_photo)
     await callback.answer()
 
 
-@router.message(HeartBuildingStates.waiting_for_photo, F.photo)
-async def process_heart_building_photo(message: Message, state: FSMContext, bot):
+@router.message(SwordsStates.waiting_for_photo, F.photo)
+async def process_swords_photo(message: Message, state: FSMContext, bot):
     user_id = message.from_user.id
     
     photo = message.photo[-1]
     file = await bot.get_file(photo.file_id)
     photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
     
-    print(f"🎨 User {user_id} - Heart Building trend photo: {photo_url}")
+    print(f"🎨 User {user_id} - Swords trend photo: {photo_url}")
     
     await state.update_data(photo_url=photo_url)
     
@@ -71,11 +78,11 @@ async def process_heart_building_photo(message: Message, state: FSMContext, bot)
         reply_markup=get_trend_aspect_ratio_keyboard()
     )
     
-    await state.set_state(HeartBuildingStates.waiting_for_aspect)
+    await state.set_state(SwordsStates.waiting_for_aspect)
 
 
-@router.callback_query(HeartBuildingStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
-async def process_heart_building_aspect(callback: CallbackQuery, state: FSMContext, bot):
+@router.callback_query(SwordsStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
+async def process_swords_aspect(callback: CallbackQuery, state: FSMContext, bot):
     from utils.nano_banana_edit_client import NanoBananaEditClient
     from aiogram.types import URLInputFile
     from database.database import Database
@@ -133,7 +140,7 @@ async def process_heart_building_aspect(callback: CallbackQuery, state: FSMConte
         edit_client = NanoBananaEditClient()
         
         task_id = await edit_client.create_edit_task(
-            prompt=HEART_BUILDING_PROMPT,
+            prompt=SWORDS_PROMPT,
             image_urls=[photo_url],
             image_size=aspect_ratio,
             output_format="png"
@@ -180,7 +187,7 @@ async def process_heart_building_aspect(callback: CallbackQuery, state: FSMConte
                     
                     print(f"✅ Photo sent successfully!")
                     
-                    db.save_generation(user_id, "trend_heart_building", result_url, HEART_BUILDING_PROMPT)
+                    db.save_generation(user_id, "trend_swords", result_url, SWORDS_PROMPT)
                     
                     from keyboards.inline import get_trends_keyboard
                     generations = db.get_user_generations(user_id)
