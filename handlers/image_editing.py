@@ -22,7 +22,7 @@ edit_client = NanoBananaEditClient()
 logger = logging.getLogger(__name__)
 
 # File ID вашего видео-примера
-EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIEuGlj9wdplHV8I7zOcjBEwTCm9aOgAALUnQACHSMgS7XAnHk3BfdnOAQ"
+EXAMPLE_VIDEO_FILE_ID = "BAACAgIAAxkBAAIBpmlj6MWT1noxhNkndG0sdWbLGN59AAIkjwACRLMgSw85wE6If6H5OAQ"
 
 
 # Временное хранилище для обработанных медиа-групп (по user_id)
@@ -102,7 +102,7 @@ async def compress_image(image_url: str, max_size_mb: float = 10.0, quality: int
 
 @router.callback_query(F.data == "image_editing")
 async def image_editing_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Редактирование изображений'"""    
+    """Обработчик кнопки 'Редактирование изображений'"""
     from database.database import Database
     
     user_id = callback.from_user.id

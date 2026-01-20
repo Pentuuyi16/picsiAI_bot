@@ -179,8 +179,17 @@ async def process_scream_aspect(callback: CallbackQuery, state: FSMContext, bot)
                     db.save_generation(user_id, "trend_scream", result_url, SCREAM_PROMPT)
                     
                     from keyboards.inline import get_trends_keyboard
-                    await callback.message.answer(
-                        "Выберите тренд, который лучше всего вам подходит 💫",
+                    generations = db.get_user_generations(user_id)
+                    
+                    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
+                    if generations == 1:
+                        generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
+                    generation_text += "</blockquote>"
+                    
+                    await bot.send_message(
+                        chat_id=callback.message.chat.id,
+                        text=f"Выберите тренд, который лучше всего вам подходит 💫\n\n{generation_text}",
+                        parse_mode="HTML",
                         reply_markup=get_trends_keyboard(page=1)
                     )
                     

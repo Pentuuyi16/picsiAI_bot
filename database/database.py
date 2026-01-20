@@ -53,18 +53,11 @@ class Database:
     
         if 'generations' not in columns:
             try:
-                self.cursor.execute('ALTER TABLE users ADD COLUMN generations INTEGER DEFAULT 1')
+                self.cursor.execute('ALTER TABLE users ADD COLUMN generations INTEGER DEFAULT 0')
                 self.conn.commit()
                 print("✅ Добавлено поле generations в таблицу users")
             except Exception as e:
                 print(f"⚠️ Ошибка добавления поля generations: {e}")
-        else:
-            # Обновляем генерации для старых пользователей с 0 генераций
-            self.cursor.execute('UPDATE users SET generations = 1 WHERE generations = 0')
-            updated_count = self.cursor.rowcount
-            self.conn.commit()
-            if updated_count > 0:
-                print(f"✅ Обновлено {updated_count} пользователей: добавлена 1 бесплатная генерация")
     
     def create_generation_purchases_table(self):
         """Создаёт таблицу для хранения покупок генераций"""
@@ -176,7 +169,7 @@ class Database:
         """Сохраняет платёж в БД"""
         self.cursor.execute('''
             INSERT INTO payments (payment_id, user_id, amount, status)
-            VALUES (?, ?, ?, ?, 'pending')
+            VALUES (?, ?, ?, 'pending')
         ''', (payment_id, user_id, amount))
         self.conn.commit()
         print(f"💾 Платёж сохранён: payment_id={payment_id}, user_id={user_id}, amount={amount}")

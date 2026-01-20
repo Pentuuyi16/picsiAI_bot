@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIN8mluoRkvRL--TTE1ow1KOomYDopYAAMVaxtIP3BLBSpumdGpsNEBAAMCAAN5AAM4BA"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIDJWluU6dyuIDP1o-S_9p31nOoyS3cAAIvEmsbdZlwS4NpeTTah_7PAQADAgADeQADOAQ"
 
 HEART_BUILDING_PROMPT = (
     "Create a realistic photo without changing your face. "
@@ -184,15 +184,15 @@ async def process_heart_building_aspect(callback: CallbackQuery, state: FSMConte
                     
                     from keyboards.inline import get_trends_keyboard
                     generations = db.get_user_generations(user_id)
-
+                    
                     generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
                     if generations == 1:
                         generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
                     generation_text += "</blockquote>"
-
+                    
                     await bot.send_message(
                         chat_id=callback.message.chat.id,
-                        text=f"Выберите тренд, который лучше всего вам подходит 💫\n\n{generation_text}",\
+                        text=f"Выберите тренд, который лучше всего вам подходит 💫\n\n{generation_text}",
                         parse_mode="HTML",
                         reply_markup=get_trends_keyboard(page=1)
                     )
