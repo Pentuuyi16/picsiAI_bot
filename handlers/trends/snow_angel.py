@@ -201,7 +201,7 @@ async def process_snow_angel_model(callback: CallbackQuery, state: FSMContext, b
                 prompt=SNOW_ANGEL_PROMPT,
                 image_urls=[photo_url],
                 aspect_ratio=aspect_ratio,
-                resolution="4K",
+                resolution="2K",
                 output_format="png"
             )
         

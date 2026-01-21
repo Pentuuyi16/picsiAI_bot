@@ -199,7 +199,7 @@ async def process_heart_building_model(callback: CallbackQuery, state: FSMContex
                 prompt=HEART_BUILDING_PROMPT,
                 image_urls=[photo_url],
                 aspect_ratio=aspect_ratio,
-                resolution="4K",
+                resolution="2K",
                 output_format="png"
             )
         
