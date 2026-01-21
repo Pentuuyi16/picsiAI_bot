@@ -128,11 +128,12 @@ class ImageEditClient:
                 elapsed_minutes = (attempt * delay) // 60
                 print(f"⏳ Проверка {attempt + 1}/{max_attempts}: {state} (прошло {elapsed_minutes} мин)")
                 
+                
                 # Отправляем прогресс пользователю каждую минуту
                 if progress_callback and attempt > 0 and attempt % 12 == 0:
-                    remaining_minutes = ((max_attempts - attempt) * delay) // 60
+                    elapsed_minutes = (attempt * delay) // 60
                     try:
-                        await progress_callback(elapsed_minutes, remaining_minutes)
+                        await progress_callback(elapsed_minutes, 5)  # Всегда показываем 5 минут
                     except Exception as e:
                         print(f"⚠️ Ошибка при отправке прогресса: {e}")
             
