@@ -27,11 +27,12 @@ class ImageEditClient:
         """Создаёт задачу на редактирование изображения"""
         url = f"{self.base_url}/api/v1/jobs/createTask"
         
+        # ИСПРАВЛЕНО: правильная структура по документации
         payload = {
             "model": "nano-banana-pro",
             "input": {
-                "image_input": image_urls,
                 "prompt": prompt,
+                "image_input": image_urls,  # Это уже список!
                 "aspect_ratio": aspect_ratio,
                 "resolution": resolution,
                 "output_format": output_format
@@ -128,10 +129,8 @@ class ImageEditClient:
                 elapsed_minutes = (attempt * delay) // 60
                 print(f"⏳ Проверка {attempt + 1}/{max_attempts}: {state} (прошло {elapsed_minutes} мин)")
                 
-                
                 # Отправляем прогресс пользователю каждую минуту
                 if progress_callback and attempt > 0 and attempt % 12 == 0:
-                    elapsed_minutes = (attempt * delay) // 60
                     try:
                         await progress_callback(elapsed_minutes, 5)  # Всегда показываем 5 минут
                     except Exception as e:
