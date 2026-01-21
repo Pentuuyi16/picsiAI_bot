@@ -1,7 +1,7 @@
 import aiohttp
 import asyncio
 import json
-from typing import Optional
+from typing import Optional, Callable
 from config import KIE_API_KEY
 
 
@@ -89,7 +89,13 @@ class ImageEditClient:
             print(f"❌ Ошибка при получении статуса: {e}")
             return None
     
-    async def wait_for_result(self, task_id: str, max_attempts: int = 120, delay: int = 5) -> Optional[str]:
+    async def wait_for_result(
+        self, 
+        task_id: str, 
+        max_attempts: int = 240,
+        delay: int = 5,
+        progress_callback: Optional[Callable] = None
+    ) -> Optional[str]:
         """
         Ожидает завершения редактирования изображения
         
@@ -97,11 +103,16 @@ class ImageEditClient:
             task_id: ID задачи
             max_attempts: Максимальное количество попыток проверки
             delay: Задержка между проверками в секундах
+            progress_callback: Опциональная функция для отправки прогресса
             
         Returns:
-            URL изображения если успешно, "MODERATION_ERROR" если ошибка модерации, None если другая ошибка или таймаут
+            URL изображения если успешно
+            "MODERATION_ERROR" если ошибка модерации
+            "TIMEOUT_ERROR" если таймаут от API
+            None если другая ошибка
         """
         print(f"⏳ Ожидание завершения редактирования задачи {task_id}...")
+        print(f"   Максимальное время ожидания: {max_attempts * delay // 60} минут")
         
         for attempt in range(max_attempts):
             status_data = await self.get_task_status(task_id)
@@ -114,12 +125,20 @@ class ImageEditClient:
             
             # Выводим прогресс каждые 6 попыток (примерно раз в 30 секунд)
             if attempt % 6 == 0:
-                print(f"⏳ Проверка {attempt + 1}/{max_attempts}: {state}...")
+                elapsed_minutes = (attempt * delay) // 60
+                print(f"⏳ Проверка {attempt + 1}/{max_attempts}: {state} (прошло {elapsed_minutes} мин)")
+                
+                # Отправляем прогресс пользователю каждую минуту
+                if progress_callback and attempt > 0 and attempt % 12 == 0:
+                    remaining_minutes = ((max_attempts - attempt) * delay) // 60
+                    try:
+                        await progress_callback(elapsed_minutes, remaining_minutes)
+                    except Exception as e:
+                        print(f"⚠️ Ошибка при отправке прогресса: {e}")
             
             if state == "success":
                 print("🎉 Редактирование завершено!")
                 
-                # Парсим resultJson
                 result_json_str = status_data.get("resultJson")
                 
                 if result_json_str:
@@ -129,7 +148,6 @@ class ImageEditClient:
                         else:
                             result_json = result_json_str
                         
-                        # Получаем URL изображения
                         result_urls = result_json.get("resultUrls", [])
                         
                         if result_urls and len(result_urls) > 0:
@@ -138,12 +156,9 @@ class ImageEditClient:
                             return image_url
                         else:
                             print("⚠️ resultUrls пуст")
-                            print(f"Full resultJson: {result_json}")
                     except Exception as e:
                         print(f"⚠️ Ошибка парсинга resultJson: {e}")
-                        print(f"resultJson value: {result_json_str}")
                 
-                print("⚠️ Редактирование завершено, но URL изображения не найден")
                 return None
             
             elif state == "fail":
@@ -153,20 +168,24 @@ class ImageEditClient:
                 print(f"Fail Code: {fail_code}")
                 print(f"Fail Message: {fail_msg}")
                 
-                # Проверяем ошибки модерации
                 fail_msg_lower = str(fail_msg).lower()
                 if ("nsfw" in fail_msg_lower or 
                     "inappropriate" in fail_msg_lower or
                     "prominent people" in fail_msg_lower or
-                    "violating content" in fail_msg_lower or
-                    str(fail_code) in ["400", "422", "500"]):
+                    "violating content" in fail_msg_lower):
                     print(f"🚫 Контент заблокирован модерацией")
                     return "MODERATION_ERROR"
                 
+                if ("timeout" in fail_msg_lower or 
+                    "timed out" in fail_msg_lower or
+                    "upstream api service timed out" in fail_msg_lower or
+                    "no results were returned" in fail_msg_lower):
+                    print(f"⏱️ Таймаут от API сервиса")
+                    return "TIMEOUT_ERROR"
+                
                 return None
             
-            # Статус "waiting", "queuing", "generating" - продолжаем ждать
             await asyncio.sleep(delay)
         
         print("❌ Превышено время ожидания редактирования")
-        return None
+        return "TIMEOUT_ERROR"
