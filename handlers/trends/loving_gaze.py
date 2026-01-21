@@ -114,8 +114,21 @@ async def process_loving_gaze_aspect(callback: CallbackQuery, state: FSMContext)
 
 @router.callback_query(LovingGazeStates.waiting_for_model, F.data.in_(["trend_model_standard", "trend_model_pro"]))
 async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, bot):
+    # СРАЗУ отвечаем на callback!
+    await callback.answer()
+    
     from database.database import Database
     from aiogram.types import URLInputFile
+    import aiohttp
+    from PIL import Image
+    from io import BytesIO
+    from aiogram.types import BufferedInputFile
+    
+    # Удаляем сообщение с выбором модели
+    try:
+        await callback.message.delete()
+    except:
+        pass
     
     model_type = "standard" if callback.data == "trend_model_standard" else "pro"
     generations_cost = 1 if model_type == "standard" else 4
@@ -125,7 +138,10 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
     aspect_ratio = data.get("aspect_ratio")
     
     if not photo_url or not aspect_ratio:
-        await callback.message.answer("❌ Ошибка: фото не найдено. Попробуйте заново.")
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="❌ Ошибка: фото не найдено. Попробуйте заново."
+        )
         await state.clear()
         return
     
@@ -143,8 +159,9 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
             ]
         )
         
-        await callback.message.answer(
-            "У вас закончились генерации 😔\n\n"
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="У вас закончились генерации 😔\n\n"
             f"<blockquote>⚡ Доступно: {generations} генераций\n"
             f"🎨 Выбранная модель требует: {generations_cost} генерации</blockquote>\n\n"
             "Купите пакет генераций, чтобы продолжить!",
@@ -152,14 +169,15 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
             reply_markup=keyboard
         )
         await state.clear()
-        await callback.answer()
         return
     # ========================================
     
     print(f"🎨 User {user_id} - Selected model: {model_type}, aspect ratio: {aspect_ratio}")
     
-    processing_msg = await callback.message.answer(
-        "⭐ Начинается редактирование, пожалуйста подождите..."
+    # Отправляем НОВОЕ сообщение о начале генерации
+    processing_msg = await bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="⭐ Начинается редактирование, пожалуйста подождите..."
     )
     
     try:
@@ -206,8 +224,8 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
                         f"💡 Профессиональная модель создает изображения в 4K, "
                         f"это требует больше времени, но результат того стоит!"
                     )
-                except:
-                    pass
+                except Exception as e:
+                    print(f"⚠️ Ошибка обновления прогресса: {e}")
             
             result_url = await edit_client.wait_for_result(
                 task_id, 
@@ -230,6 +248,18 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
                     "💡 Совет: используйте обычные фотографии\n\n"
                     "💛 Не переживайте, генерация не списана"
                 )
+            elif result_url == "TIMEOUT_ERROR":
+                await processing_msg.edit_text(
+                    "⏱️ Время ожидания истекло\n\n"
+                    "Сервер генерации не успел обработать запрос.\n\n"
+                    "Возможные причины:\n"
+                    "• Очень высокая нагрузка на сервер\n"
+                    "• Слишком сложное изображение\n\n"
+                    "💡 Попробуйте:\n"
+                    "• Подождать 5-10 минут и попробовать снова\n"
+                    "• Использовать стандартную модель (она быстрее)\n\n"
+                    "💛 Не переживайте, генерация не списана"
+                )
             else:
                 # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
                 db.subtract_generations(user_id, generations_cost)
@@ -238,7 +268,42 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
                 print(f"✅ Generation successful! Result URL: {result_url}")
                 
                 try:
-                    photo_file = URLInputFile(result_url)
+                    print(f"📤 Отправка изображения: {result_url}")
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(result_url) as response:
+                            image_data = await response.read()
+                            original_size_mb = len(image_data) / (1024 * 1024)
+                            print(f"   Размер: {original_size_mb:.2f} MB")
+                    
+                    if original_size_mb > 9.0:
+                        print(f"   🔧 Сжимаем изображение...")
+                        img = Image.open(BytesIO(image_data))
+                        
+                        if img.mode in ('RGBA', 'P', 'LA'):
+                            background = Image.new('RGB', img.size, (255, 255, 255))
+                            if img.mode == 'P':
+                                img = img.convert('RGBA')
+                            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                            img = background
+                        
+                        output = BytesIO()
+                        quality = 85
+                        while quality > 20:
+                            output.seek(0)
+                            output.truncate()
+                            img.save(output, format='JPEG', quality=quality, optimize=True)
+                            size_mb = output.tell() / (1024 * 1024)
+                            if size_mb <= 9.0:
+                                break
+                            quality -= 5
+                        
+                        output.seek(0)
+                        photo_file = BufferedInputFile(output.read(), filename="image.jpg")
+                        print(f"   ✅ Сжато до {size_mb:.2f} MB")
+                    else:
+                        photo_file = URLInputFile(result_url)
+                    
                     await bot.send_photo(
                         chat_id=callback.message.chat.id,
                         photo=photo_file,
@@ -291,4 +356,3 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
         )
     
     await state.clear()
-    await callback.answer()

@@ -140,40 +140,42 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(BouquetStates.waiting_for_model, F.data.in_(["trend_model_standard", "trend_model_pro"]))
 async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot):
+    # СРАЗУ отвечаем на callback!
+    await callback.answer()
+    
     from database.database import Database
     import aiohttp
     from PIL import Image
     from io import BytesIO
     from aiogram.types import URLInputFile, BufferedInputFile
     
-    # ВАЖНО: Сразу отвечаем на callback чтобы он не устарел
-    await callback.answer()
-    
     # Удаляем сообщение с выбором модели
     try:
         await callback.message.delete()
     except:
         pass
-    
+
     model_type = "standard" if callback.data == "trend_model_standard" else "pro"
     generations_cost = 1 if model_type == "standard" else 4
-    
+
     data = await state.get_data()
     photo_url = data.get("photo_url")
-    user_name = data.get("user_name")
+    user_name = data.get("user_name")  # ВАЖНО: получаем имя!
     aspect_ratio = data.get("aspect_ratio")
-    
+
     if not photo_url or not user_name or not aspect_ratio:
-        await callback.message.answer("❌ Ошибка: данные не найдены. Попробуйте заново.")
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="❌ Ошибка: данные не найдены. Попробуйте заново."
+        )   
         await state.clear()
         return
-    
+
     user_id = callback.from_user.id
-    
-    # ========== ПРОВЕРКА ГЕНЕРАЦИЙ ==========
+
     db = Database()
     generations = db.get_user_generations(user_id)
-    
+
     if generations < generations_cost:
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -181,9 +183,10 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
             ]
         )
-        
-        await callback.message.answer(
-            "У вас закончились генерации 😔\n\n"
+    
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="У вас закончились генерации 😔\n\n"
             f"<blockquote>⚡ Доступно: {generations} генераций\n"
             f"🎨 Выбранная модель требует: {generations_cost} генерации</blockquote>\n\n"
             "Купите пакет генераций, чтобы продолжить!",
@@ -192,25 +195,24 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
         )
         await state.clear()
         return
-    # ========================================
-    
+
     print(f"🎨 User {user_id} - Selected model: {model_type}, aspect ratio: {aspect_ratio}")
-    
+
+    # СОЗДАЕМ ФИНАЛЬНЫЙ ПРОМПТ С ИМЕНЕМ!
     name_upper = user_name.upper()
     name_letters = ", ".join([f'"{letter}"' for letter in name_upper])
     final_prompt = BOUQUET_PROMPT_TEMPLATE.format(name_letters=name_letters)
     
     print(f"📝 Final prompt: {final_prompt}")
-    
-    processing_msg = await callback.message.answer(
-        "⭐ Начинается редактирование, пожалуйста подождите..."
+
+    processing_msg = await bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="⭐ Начинается редактирование, пожалуйста подождите..."
     )
     
     try:
         if model_type == "standard":
-            # Используем google/nano-banana-edit
             from utils.nano_banana_edit_client import NanoBananaEditClient
-            
             edit_client = NanoBananaEditClient()
             
             task_id = await edit_client.create_edit_task(
@@ -220,9 +222,7 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                 output_format="png"
             )
         else:
-            # Используем nano-banana-pro
             from utils.image_edit_client import ImageEditClient
-            
             edit_client = ImageEditClient()
             
             task_id = await edit_client.create_edit_task(
@@ -254,8 +254,8 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                         f"💡 Профессиональная модель создает изображения в 4K, "
                         f"это требует больше времени, но результат того стоит!"
                     )
-                except:
-                    pass
+                except Exception as e:
+                    print(f"⚠️ Ошибка обновления прогресса: {e}")
             
             result_url = await edit_client.wait_for_result(
                 task_id, 
@@ -278,6 +278,18 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                     "💡 Совет: используйте обычные фотографии\n\n"
                     "💛 Не переживайте, генерация не списана"
                 )
+            elif result_url == "TIMEOUT_ERROR":
+                await processing_msg.edit_text(
+                    "⏱️ Время ожидания истекло\n\n"
+                    "Сервер генерации не успел обработать запрос.\n\n"
+                    "Возможные причины:\n"
+                    "• Очень высокая нагрузка на сервер\n"
+                    "• Слишком сложное изображение\n\n"
+                    "💡 Попробуйте:\n"
+                    "• Подождать 5-10 минут и попробовать снова\n"
+                    "• Использовать стандартную модель (она быстрее)\n\n"
+                    "💛 Не переживайте, генерация не списана"
+                )
             else:
                 # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
                 db.subtract_generations(user_id, generations_cost)
@@ -286,7 +298,6 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                 print(f"✅ Generation successful! Result URL: {result_url}")
                 
                 try:
-                    # Скачиваем и проверяем размер изображения
                     print(f"📤 Отправка изображения: {result_url}")
                     
                     async with aiohttp.ClientSession() as session:
@@ -295,12 +306,10 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                             original_size_mb = len(image_data) / (1024 * 1024)
                             print(f"   Размер: {original_size_mb:.2f} MB")
                     
-                    # Если файл больше 9 МБ - сжимаем
                     if original_size_mb > 9.0:
                         print(f"   🔧 Сжимаем изображение...")
                         img = Image.open(BytesIO(image_data))
                         
-                        # Конвертируем в RGB
                         if img.mode in ('RGBA', 'P', 'LA'):
                             background = Image.new('RGB', img.size, (255, 255, 255))
                             if img.mode == 'P':
@@ -308,7 +317,6 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                             background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
                             img = background
                         
-                        # Сжимаем до 9 МБ
                         output = BytesIO()
                         quality = 85
                         while quality > 20:
@@ -324,7 +332,6 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                         photo_file = BufferedInputFile(output.read(), filename="image.jpg")
                         print(f"   ✅ Сжато до {size_mb:.2f} MB")
                     else:
-                        # Файл уже маленький - отправляем как есть
                         photo_file = URLInputFile(result_url)
                     
                     await bot.send_photo(

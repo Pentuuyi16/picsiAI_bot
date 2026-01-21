@@ -118,36 +118,40 @@ async def process_snowboard_aspect(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(SnowboardStates.waiting_for_model, F.data.in_(["trend_model_standard", "trend_model_pro"]))
 async def process_snowboard_model(callback: CallbackQuery, state: FSMContext, bot):
+    await callback.answer()
     from database.database import Database
     import aiohttp
     from PIL import Image
     from io import BytesIO
     from aiogram.types import URLInputFile, BufferedInputFile
     
-    await callback.answer()
+    
     
     try:
         await callback.message.delete()
     except:
         pass
-    
+
     model_type = "standard" if callback.data == "trend_model_standard" else "pro"
     generations_cost = 1 if model_type == "standard" else 4
-    
+
     data = await state.get_data()
     photo_url = data.get("photo_url")
     aspect_ratio = data.get("aspect_ratio")
-    
+
     if not photo_url or not aspect_ratio:
-        await callback.message.answer("❌ Ошибка: фото не найдено. Попробуйте заново.")
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="❌ Ошибка: фото не найдено. Попробуйте заново."
+        )   
         await state.clear()
         return
-    
+
     user_id = callback.from_user.id
-    
+
     db = Database()
     generations = db.get_user_generations(user_id)
-    
+
     if generations < generations_cost:
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -155,9 +159,10 @@ async def process_snowboard_model(callback: CallbackQuery, state: FSMContext, bo
                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
             ]
         )
-        
-        await callback.message.answer(
-            "У вас закончились генерации 😔\n\n"
+    
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="У вас закончились генерации 😔\n\n"
             f"<blockquote>⚡ Доступно: {generations} генераций\n"
             f"🎨 Выбранная модель требует: {generations_cost} генерации</blockquote>\n\n"
             "Купите пакет генераций, чтобы продолжить!",
@@ -166,11 +171,12 @@ async def process_snowboard_model(callback: CallbackQuery, state: FSMContext, bo
         )
         await state.clear()
         return
-    
+
     print(f"🎨 User {user_id} - Selected model: {model_type}, aspect ratio: {aspect_ratio}")
-    
-    processing_msg = await callback.message.answer(
-        "⭐ Начинается редактирование, пожалуйста подождите..."
+
+    processing_msg = await bot.send_message(
+        chat_id=callback.message.chat.id,
+        text="⭐ Начинается редактирование, пожалуйста подождите..."
     )
     
     try:
