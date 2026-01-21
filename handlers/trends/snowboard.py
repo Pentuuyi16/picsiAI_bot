@@ -198,7 +198,7 @@ async def process_snowboard_model(callback: CallbackQuery, state: FSMContext, bo
                 prompt=SNOWBOARD_PROMPT,
                 image_urls=[photo_url],
                 aspect_ratio=aspect_ratio,
-                resolution="4K",
+                resolution="2K",
                 output_format="png"
             )
         
