@@ -27,21 +27,30 @@ class ImageEditClient:
         """Создаёт задачу на редактирование изображения"""
         url = f"{self.base_url}/api/v1/jobs/createTask"
         
-        # ИСПРАВЛЕНО: правильная структура по документации
         payload = {
             "model": "nano-banana-pro",
             "input": {
                 "prompt": prompt,
-                "image_input": image_urls,  # Это уже список!
+                "image_input": image_urls,
                 "aspect_ratio": aspect_ratio,
                 "resolution": resolution,
                 "output_format": output_format
             }
         }
         
-        print(f"📤 Отправка запроса на редактирование изображения:")
-        print(f"   URL: {url}")
-        print(f"   Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+        print(f"\n{'='*70}")
+        print(f"📤 PRO MODEL - ОТПРАВКА ЗАПРОСА")
+        print(f"{'='*70}")
+        print(f"URL: {url}")
+        print(f"Model: nano-banana-pro")
+        print(f"Prompt length: {len(prompt)} chars")
+        print(f"Image URLs: {image_urls}")
+        print(f"Aspect ratio: {aspect_ratio}")
+        print(f"Resolution: {resolution}")
+        print(f"Output format: {output_format}")
+        print(f"\nFull Payload:")
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(f"{'='*70}\n")
         
         try:
             timeout = aiohttp.ClientTimeout(total=60)
@@ -56,15 +65,25 @@ class ImageEditClient:
                     
                     if data.get("code") == 200:
                         task_id = data.get("data", {}).get("taskId")
-                        print(f"✅ Task ID получен: {task_id}")
+                        print(f"✅ Task ID получен: {task_id}\n")
                         return task_id
                     else:
-                        print(f"❌ Ошибка создания задачи (code: {data.get('code')}): {data.get('msg')}")
+                        print(f"\n{'='*70}")
+                        print(f"❌ ОШИБКА СОЗДАНИЯ ЗАДАЧИ")
+                        print(f"{'='*70}")
+                        print(f"Code: {data.get('code')}")
+                        print(f"Message: {data.get('msg')}")
+                        print(f"Full response: {json.dumps(data, ensure_ascii=False, indent=2)}")
+                        print(f"{'='*70}\n")
                         return None
         except Exception as e:
-            print(f"❌ Исключение при создании задачи: {e}")
+            print(f"\n{'='*70}")
+            print(f"❌ ИСКЛЮЧЕНИЕ ПРИ СОЗДАНИИ ЗАДАЧИ")
+            print(f"{'='*70}")
+            print(f"Exception: {e}")
             import traceback
             traceback.print_exc()
+            print(f"{'='*70}\n")
             return None
     
     async def get_task_status(self, task_id: str) -> Optional[dict]:
@@ -132,7 +151,7 @@ class ImageEditClient:
                 # Отправляем прогресс пользователю каждую минуту
                 if progress_callback and attempt > 0 and attempt % 12 == 0:
                     try:
-                        await progress_callback(elapsed_minutes, 5)  # Всегда показываем 5 минут
+                        await progress_callback(elapsed_minutes, 5)
                     except Exception as e:
                         print(f"⚠️ Ошибка при отправке прогресса: {e}")
             
