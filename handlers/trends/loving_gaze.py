@@ -194,7 +194,30 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
         
         print(f"✅ Task created: {task_id}")
         
-        result_url = await edit_client.wait_for_result(task_id, max_attempts=120, delay=5)
+        if model_type == "pro":
+            # Для Pro модели: увеличенный таймаут и показ прогресса
+            async def update_progress(elapsed_min, remaining_min):
+                """Обновляет сообщение с прогрессом для пользователя"""
+                try:
+                    await processing_msg.edit_text(
+                        f"⭐ Идет генерация в высоком качестве...\n\n"
+                        f"⏱️ Прошло: {elapsed_min} мин\n"
+                        f"⏳ Осталось примерно: {remaining_min} мин\n\n"
+                        f"💡 Профессиональная модель создает изображения в 4K, "
+                        f"это требует больше времени, но результат того стоит!"
+                    )
+                except:
+                    pass
+            
+            result_url = await edit_client.wait_for_result(
+                task_id, 
+                max_attempts=240,  # 20 минут для Pro
+                delay=5,
+                progress_callback=update_progress
+            )
+        else:
+            # Для Standard модели: обычный таймаут без прогресса
+            result_url = await edit_client.wait_for_result(task_id, max_attempts=120, delay=5)
         
         if result_url:
             if result_url == "MODERATION_ERROR":
