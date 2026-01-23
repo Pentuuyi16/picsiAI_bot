@@ -8,19 +8,17 @@ router = Router()
 PHOTO_FILE_ID = "AgACAgIAAxkBAAIVg2lznnLtuEWuGS1IPJMSXCjwG2GVAALXD2sbcmegS7K6747i6gxlAQADAgADdwADOAQ"
 
 AVATAR_PROMPT = (
-    "Cinematic jungle scene, dense tropical rainforest with towering trees and hanging vines, "
-    "soft filtered sunlight breaking through the canopy creating dramatic light rays and deep shadows. "
-    "Person standing on a thick tree branch or jungle ground in a confident dynamic pose, "
-    "wearing blue Na'vi-inspired tribal outfit, skin painted with natural blue body paint covering face and visible body, "
-    "tribal markings and patterns, face painted with white and darker blue ceremonial stripes, "
-    "long dark hair with small braids and natural ornaments like feathers or beads. "
-    "Bare feet or minimal tribal footwear, natural connection to environment. "
-    "Cinematic wide-angle shot, low-to-mid angle perspective emphasizing heroic presence against the jungle backdrop. "
-    "Rich saturated colors, teal and emerald green jungle tones contrasting with bright blue skin, "
-    "soft warm sunlight highlighting the figure, backlit glow effect creating separation from background. "
-    "Photorealistic Avatar movie aesthetic, film grain texture, shallow depth of field with sharp subject focus, "
-    "ultra high detail 4K quality, moody atmospheric lighting."
+    "Используй загруженное изображение как точный и обязательный референс. "
+    "НЕ меняй фон, локацию, окружение, задний план, сцену или освещение окружения. Оставь оригинальный фон полностью без изменений. "
+    "НЕ меняй ракурс камеры, НЕ меняй позу, НЕ кадрируй изображение, НЕ приближай лицо и НЕ меняй масштаб. "
+    "Сохрани оригинальную композицию, расстояние камеры, перспективу, пропорции тела и положение человека. "
+    "Преобразуй человека на фото в персонажа из фильма «Аватар» (Na'vi), строго сохраняя пол, рост, телосложение, анатомию и индивидуальные черты внешности. "
+    "Черты лица должны быть полностью сохранены: форма лица, глаза, нос, губы, скулы, челюсть, пропорции и мимика должны максимально совпадать с оригиналом. "
+    "Сделай синюю кожу с биолюминесцентными узорами и стиль Na'vi, оставляя полный рост (full body) и исходные пропорции тела. "
+    "Используй фотореализм, cinematic lighting, ultra-detailed, 8k, realistic textures. "
+    "Одежду оставить без изменений."
 )
+
 
 
 class AvatarStates(StatesGroup):
