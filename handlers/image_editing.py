@@ -334,7 +334,7 @@ async def process_edit_model(callback: CallbackQuery, state: FSMContext, bot: Bo
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations_from_editing")],
                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
             ]
         )

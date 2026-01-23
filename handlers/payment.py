@@ -98,14 +98,26 @@ async def top_up_balance_photo_handler(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == "top_up_balance_video")
-async def top_up_balance_video_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Пополнить баланс' из раздела 'Видео-контент'"""
+@router.callback_query(F.data == "top_up_balance_video_menu")
+async def top_up_balance_video_menu_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Пополнить баланс' из меню видео-контент"""
     user_balance_context[callback.from_user.id] = "video_menu"
 
     await callback.message.answer(
         "💰 Выберите сумму для пополнения:",
         reply_markup=get_balance_amounts_keyboard(back_to="video_menu")
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "top_up_balance_video")
+async def top_up_balance_video_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Пополнить баланс' из раздела 'Создание видео'"""
+    user_balance_context[callback.from_user.id] = "video_generation"
+
+    await callback.message.answer(
+        "💰 Выберите сумму для пополнения:",
+        reply_markup=get_balance_amounts_keyboard(back_to="video_generation")
     )
     await callback.answer()
 

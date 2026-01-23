@@ -18,24 +18,24 @@ GENERATION_PACKAGES = {
 user_gen_context = {}
 
 
-@router.callback_query(F.data == "buy_generations")
-async def buy_generations_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Купить генерации'"""
-    # Определяем откуда пришел пользователь по тексту сообщения или callback
-    user_id = callback.from_user.id
-
-    # По умолчанию возвращаем в images_menu
-    user_gen_context[user_id] = "images_menu"
-
-    keyboard = InlineKeyboardMarkup(
+def show_generation_packages(back_to: str = "images_menu"):
+    """Создает клавиатуру с пакетами генераций"""
+    return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="10 генераций - 99₽", callback_data="select_gen_10")],
             [InlineKeyboardButton(text="🔥 25 генераций - 199₽", callback_data="select_gen_25")],
             [InlineKeyboardButton(text="50 генераций - 399₽", callback_data="select_gen_50")],
             [InlineKeyboardButton(text="🔥 100 генераций - 799₽", callback_data="select_gen_100")],
-            [InlineKeyboardButton(text="Назад", callback_data="back_from_gen_purchase")]
+            [InlineKeyboardButton(text="Назад", callback_data=f"back_gen_{back_to}")]
         ]
     )
+
+
+@router.callback_query(F.data == "buy_generations")
+async def buy_generations_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Купить генерации' из меню изображений"""
+    user_id = callback.from_user.id
+    user_gen_context[user_id] = "images_menu"
 
     try:
         await callback.message.delete()
@@ -44,7 +44,43 @@ async def buy_generations_handler(callback: CallbackQuery):
 
     await callback.message.answer(
         "Выберите пакет генераций и начните создавать прямо сейчас ✨",
-        reply_markup=keyboard
+        reply_markup=show_generation_packages("images_menu")
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "buy_generations_from_editing")
+async def buy_generations_from_editing_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Купить генерации' из редактирования"""
+    user_id = callback.from_user.id
+    user_gen_context[user_id] = "image_editing"
+
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    await callback.message.answer(
+        "Выберите пакет генераций и начните создавать прямо сейчас ✨",
+        reply_markup=show_generation_packages("image_editing")
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "buy_generations_from_trends")
+async def buy_generations_from_trends_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Купить генерации' из трендов"""
+    user_id = callback.from_user.id
+    user_gen_context[user_id] = "trends"
+
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    await callback.message.answer(
+        "Выберите пакет генераций и начните создавать прямо сейчас ✨",
+        reply_markup=show_generation_packages("trends")
     )
     await callback.answer()
 
@@ -112,9 +148,9 @@ async def select_generation_package_handler(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == "back_from_gen_purchase")
-async def back_from_gen_purchase_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Назад' из покупки генераций"""
+@router.callback_query(F.data == "back_gen_images_menu")
+async def back_gen_images_menu_handler(callback: CallbackQuery):
+    """Назад в меню изображений"""
     from keyboards.inline import get_images_menu_keyboard
     from database.database import Database
 
@@ -127,21 +163,31 @@ async def back_from_gen_purchase_handler(callback: CallbackQuery):
         generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
     generation_text += "</blockquote>"
 
-    text = (
-        "<b>🖼️ Работа с изображениями</b>\n\n"
-        "✨ <b>Создать фото</b> — генерация изображений с нуля\n"
-        "🎨 <b>Отредактировать фото</b> — изменить изображение по описанию\n\n"
-        f"{generation_text}"
-    )
-
     try:
         await callback.message.delete()
     except:
         pass
 
     await callback.message.answer(
-        text,
+        "<b>🖼️ Работа с изображениями</b>\n\n"
+        "✨ <b>Создать фото</b> — генерация изображений с нуля\n"
+        "🎨 <b>Отредактировать фото</b> — изменить изображение по описанию\n\n"
+        f"{generation_text}",
         parse_mode="HTML",
         reply_markup=get_images_menu_keyboard()
     )
     await callback.answer()
+
+
+@router.callback_query(F.data == "back_gen_image_editing")
+async def back_gen_image_editing_handler(callback: CallbackQuery):
+    """Назад в редактирование"""
+    from handlers.image_editing import image_editing_handler
+    await image_editing_handler(callback)
+
+
+@router.callback_query(F.data == "back_gen_trends")
+async def back_gen_trends_handler(callback: CallbackQuery):
+    """Назад в тренды"""
+    from handlers.trends import trends_handler
+    await trends_handler(callback)

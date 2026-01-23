@@ -154,7 +154,7 @@ async def process_loving_gaze_model(callback: CallbackQuery, state: FSMContext, 
     if generations < generations_cost:
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations_from_trends")],
                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
             ]
         )

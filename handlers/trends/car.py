@@ -151,7 +151,7 @@ async def process_car_model(callback: CallbackQuery, state: FSMContext, bot):
     if generations < generations_cost:
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
+                [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations_from_trends")],
                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
             ]
         )
