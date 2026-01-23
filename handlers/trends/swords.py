@@ -16,7 +16,6 @@ SWORDS_PROMPT = (
     "Woman sitting on the slope with her back resting against the giant sword, knees slightly bent, "
     "legs angled downhill. One arm resting on her knee, the other touching the grass for balance. "
     "Head slightly tilted and turned sideways, calm but powerful expression. "
-    "Long dark hair blown backward by wind, strong motion flow. "
     "Light translucent veil trailing behind, flowing in the wind. "
     "Warm ivory structured dress, matte fabric, elegant heroic silhouette. "
     "Cinematic lighting, soft contrast, subtle rim light outlining the figure. "
