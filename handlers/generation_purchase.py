@@ -14,10 +14,19 @@ GENERATION_PACKAGES = {
     "gen_100": {"count": 100, "price": 799.0}
 }
 
+# Словарь для хранения контекста откуда пришел пользователь
+user_gen_context = {}
+
 
 @router.callback_query(F.data == "buy_generations")
 async def buy_generations_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Купить генерации'"""
+    # Определяем откуда пришел пользователь по тексту сообщения или callback
+    user_id = callback.from_user.id
+
+    # По умолчанию возвращаем в images_menu
+    user_gen_context[user_id] = "images_menu"
+
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="10 генераций - 99₽", callback_data="select_gen_10")],
@@ -27,12 +36,12 @@ async def buy_generations_handler(callback: CallbackQuery):
             [InlineKeyboardButton(text="Назад", callback_data="back_from_gen_purchase")]
         ]
     )
-    
+
     try:
         await callback.message.delete()
     except:
         pass
-    
+
     await callback.message.answer(
         "Выберите пакет генераций и начните создавать прямо сейчас ✨",
         reply_markup=keyboard
@@ -106,17 +115,33 @@ async def select_generation_package_handler(callback: CallbackQuery):
 @router.callback_query(F.data == "back_from_gen_purchase")
 async def back_from_gen_purchase_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Назад' из покупки генераций"""
-    from utils.texts import TEXTS
-    from keyboards.inline import get_main_menu_keyboard
-    
+    from keyboards.inline import get_images_menu_keyboard
+    from database.database import Database
+
+    user_id = callback.from_user.id
+    db = Database()
+    generations = db.get_user_generations(user_id)
+
+    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
+    if generations == 1 and not db.has_purchased_generations(user_id):
+        generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
+    generation_text += "</blockquote>"
+
+    text = (
+        "<b>🖼️ Работа с изображениями</b>\n\n"
+        "✨ <b>Создать фото</b> — генерация изображений с нуля\n"
+        "🎨 <b>Отредактировать фото</b> — изменить изображение по описанию\n\n"
+        f"{generation_text}"
+    )
+
     try:
         await callback.message.delete()
     except:
         pass
-    
+
     await callback.message.answer(
-        TEXTS['welcome_message'],
+        text,
         parse_mode="HTML",
-        reply_markup=get_main_menu_keyboard()
+        reply_markup=get_images_menu_keyboard()
     )
     await callback.answer()

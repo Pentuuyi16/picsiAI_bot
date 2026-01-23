@@ -100,12 +100,12 @@ async def top_up_balance_photo_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "top_up_balance_video")
 async def top_up_balance_video_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Пополнить баланс' из раздела 'Создание видео'"""
-    user_balance_context[callback.from_user.id] = "video_generation"
-    
+    """Обработчик кнопки 'Пополнить баланс' из раздела 'Видео-контент'"""
+    user_balance_context[callback.from_user.id] = "video_menu"
+
     await callback.message.answer(
         "💰 Выберите сумму для пополнения:",
-        reply_markup=get_balance_amounts_keyboard(back_to="video_generation")
+        reply_markup=get_balance_amounts_keyboard(back_to="video_menu")
     )
     await callback.answer()
 
@@ -175,6 +175,39 @@ async def back_to_photo_animation_handler(callback: CallbackQuery):
         caption=text,
         parse_mode="HTML",
         reply_markup=get_photo_animation_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_video_menu")
+async def back_to_video_menu_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Назад' - возврат в меню видео-контент"""
+    from database.database import Database
+    from keyboards.inline import get_video_menu_keyboard
+
+    user_id = callback.from_user.id
+    db = Database()
+    user = db.get_user(user_id)
+    balance = user['balance'] if user else 0.00
+
+    text = (
+        "<b>🎬 Видео-контент</b>\n\n"
+        "Создавайте видеоконтент с помощью ИИ:\n\n"
+        "📸 <b>Оживить фото</b> — превратите фотографию в короткое видео\n"
+        "🎥 <b>Создать видео</b> — сгенерируйте видео по описанию или фото\n"
+        "🕺 <b>Управление движением</b> — добавьте движение на фото (Kling)\n\n"
+        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽</blockquote>"
+    )
+
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    await callback.message.answer(
+        text,
+        reply_markup=get_video_menu_keyboard(),
+        parse_mode="HTML"
     )
     await callback.answer()
 
