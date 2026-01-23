@@ -37,6 +37,7 @@ class ImageEditingStates(StatesGroup):
     waiting_for_aspect_ratio = State()
     waiting_for_photos = State()
     waiting_for_description = State()
+    waiting_for_model = State()
 
 
 async def compress_image(image_url: str, max_size_mb: float = 10.0, quality: int = 85) -> BufferedInputFile:
@@ -255,83 +256,174 @@ async def handle_edit_photos(message: Message, state: FSMContext, bot: Bot):
 async def process_edit_description(message: Message, state: FSMContext, bot: Bot):
     """Обработчик описания редактирования"""
     from database.database import Database
-    import json
-    
+    from keyboards.inline import get_trend_model_selection_keyboard
+
+    prompt = message.text
+
+    # Сохраняем промпт
+    await state.update_data(edit_prompt=prompt)
+
     db = Database()
-    user = db.get_user(message.from_user.id)
-    
+    user_id = message.from_user.id
+    generations = db.get_user_generations(user_id)
+
+    # Показываем выбор модели
+    await message.answer(
+        "<b>🤖 Выбор модели генерации</b>\n\n"
+        "<b>Активная модель: Стандартная</b>\n\n"
+        "<b>🌟 Стандартная (Nano Banana)</b>\n"
+        "• Цена: <b><i>1 генерация</i></b>\n"
+        "• Качество: <b><i>стабильно хорошее</i></b>\n"
+        "• Скорость: <b><i>молниеносная ⚡</i></b>\n\n"
+        "<b>🚀 Профессиональная (Nano Banana Pro)</b>\n"
+        "• Цена: <b><i>4 генерации</i></b>\n"
+        "• Разрешение: <b><i>ультра-чёткое 4K</i></b>\n"
+        "• Качество: <b><i>максимальный уровень детализации</i></b>\n"
+        "• Промты до <b><i>5000 символов</i></b>\n"
+        "• <b><i>Продвинутое понимание текста</i></b> для точных результатов\n\n"
+        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
+        parse_mode="HTML",
+        reply_markup=get_trend_model_selection_keyboard(generations)
+    )
+
+    await state.set_state(ImageEditingStates.waiting_for_model)
+
+
+@router.callback_query(ImageEditingStates.waiting_for_model, F.data.in_(["trend_model_standard", "trend_model_pro"]))
+async def process_edit_model(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    """Обработчик выбора модели для редактирования"""
+    from database.database import Database
+    import json
+
+    await callback.answer()
+
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    model_type = "standard" if callback.data == "trend_model_standard" else "pro"
+    generations_cost = 1 if model_type == "standard" else 4
+
+    db = Database()
+    user_id = callback.from_user.id
+    chat_id = callback.message.chat.id
+
     # Получаем данные состояния
     data = await state.get_data()
-    
+
     # Проверяем количество генераций
-    generations = db.get_user_generations(message.from_user.id)
-    
-    if generations < 1:
+    generations = db.get_user_generations(user_id)
+
+    if generations < generations_cost:
         # Недостаточно генераций - предлагаем купить
-        prompt = message.text
+        prompt = data.get('edit_prompt')
         action_data = json.dumps({
             "back_to": "image_editing",
             "state_data": data,
-            "prompt": prompt
+            "prompt": prompt,
+            "model_type": model_type
         })
-        db.save_pending_action(message.from_user.id, "image_editing_pending", action_data)
-        
+        db.save_pending_action(user_id, "image_editing_pending", action_data)
+
         print(f"💾 Сохранено состояние для редактирования изображения:")
         print(f"   Aspect ratio: {data.get('edit_aspect_ratio')}")
         print(f"   Photos: {len(data.get('edit_photos', []))} шт")
         print(f"   Prompt: {prompt}")
-        
+        print(f"   Model: {model_type}")
+
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
             ]
         )
-        
-        await message.answer(
-            "У вас закончились генерации 😔\n\n"
+
+        await bot.send_message(
+            chat_id=chat_id,
+            text="У вас закончились генерации 😔\n\n"
             f"<blockquote>⚡ Доступно: {generations} генераций\n"
-            f"🎨 Редактирование 1 фото = 1 генерация</blockquote>\n\n"
+            f"🎨 Выбранная модель требует: {generations_cost} генерации</blockquote>\n\n"
             "Купите пакет генераций, чтобы продолжить!",
             parse_mode="HTML",
             reply_markup=keyboard
         )
-        # НЕ очищаем состояние!
+        await state.clear()
         return
-    
-    prompt = message.text
+
+    prompt = data.get('edit_prompt')
     aspect_ratio = data.get("edit_aspect_ratio", "1:1")
     photos = data.get("edit_photos", [])
-    
+
     logger.info(f"Получен промпт: {prompt}")
-    logger.info(f"Соотношение: {aspect_ratio}, Фото: {len(photos)}")
-    
+    logger.info(f"Соотношение: {aspect_ratio}, Фото: {len(photos)}, Модель: {model_type}")
+
     # Отправляем сообщение о начале редактирования
-    processing_msg = await message.answer(
-        "⭐ Начинается редактирование изображения, совсем скоро пришлем результат"
+    processing_msg = await bot.send_message(
+        chat_id=chat_id,
+        text="⭐ Начинается редактирование изображения, совсем скоро пришлем результат"
     )
-    
+
     try:
-        # Создаём задачу на редактирование (используем nano-banana-edit API)
-        task_id = await edit_client.create_edit_task(
-            prompt=prompt,
-            image_urls=photos,
-            image_size=aspect_ratio,
-            output_format="png"
-        )
-        
+        # Выбираем клиента в зависимости от модели
+        if model_type == "standard":
+            from utils.nano_banana_edit_client import NanoBananaEditClient
+            edit_client_instance = NanoBananaEditClient()
+
+            task_id = await edit_client_instance.create_edit_task(
+                prompt=prompt,
+                image_urls=photos,
+                image_size=aspect_ratio,
+                output_format="png"
+            )
+        else:
+            from utils.image_edit_client import ImageEditClient
+            edit_client_instance = ImageEditClient()
+
+            task_id = await edit_client_instance.create_edit_task(
+                prompt=prompt,
+                image_urls=photos,
+                aspect_ratio=aspect_ratio,
+                resolution="2K",
+                output_format="png"
+            )
+
         logger.info(f"Task ID: {task_id}")
-        
+
         if not task_id:
             await processing_msg.edit_text(
                 "❌ Произошла ошибка при создании задачи. Попробуйте позже."
             )
             await state.clear()
             return
-        
+
         # Ожидаем завершения редактирования
         logger.info("Ожидание завершения редактирования...")
-        image_url = await edit_client.wait_for_result(task_id, max_attempts=120, delay=5)
+
+        if model_type == "pro":
+            # Для Pro модели: увеличенный таймаут и показ прогресса
+            async def update_progress(elapsed_min, remaining_min):
+                """Обновляет сообщение с прогрессом для пользователя"""
+                try:
+                    await processing_msg.edit_text(
+                        f"⭐ Идет генерация в высоком качестве...\n\n"
+                        f"⏱️ Прошло: {elapsed_min} мин\n"
+                        f"⏳ Осталось примерно: {remaining_min} мин\n\n"
+                        f"💡 Профессиональная модель создает изображения в 4K, "
+                        f"это требует больше времени, но результат того стоит!"
+                    )
+                except:
+                    pass
+
+            image_url = await edit_client_instance.wait_for_result(
+                task_id,
+                max_attempts=240,  # 20 минут для Pro
+                delay=5,
+                progress_callback=update_progress
+            )
+        else:
+            # Для Standard модели: обычный таймаут без прогресса
+            image_url = await edit_client_instance.wait_for_result(task_id, max_attempts=120, delay=5)
         
         logger.info(f"Image URL: {image_url}")
         
@@ -348,35 +440,36 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                     "💛 Не переживайте, генерация не списана"
                 )
             else:
-                # Успешная генерация - списываем 1 генерацию
-                db.subtract_generations(message.from_user.id, 1)
-                
+                # Успешная генерация - списываем генерации
+                db.subtract_generations(user_id, generations_cost)
+
                 # Отправляем изображение
                 try:
                     print(f"\n{'='*70}")
                     print(f"📤 ОТПРАВКА ИЗОБРАЖЕНИЯ В TELEGRAM")
-                    print(f"Chat ID: {message.chat.id}")
+                    print(f"Chat ID: {chat_id}")
                     print(f"Image URL: {image_url}")
+                    print(f"Model: {model_type} (cost: {generations_cost})")
                     print(f"{'='*70}\n")
-                    
+
                     # Сжимаем изображение
                     compressed_image = await compress_image(image_url, max_size_mb=9.5, quality=85)
-                    
+
                     print(f"📤 Отправляем сжатое изображение...")
                     sent_message = await bot.send_photo(
-                        chat_id=message.chat.id,
+                        chat_id=chat_id,
                         photo=compressed_image,
                         caption="✨ Ваше изображение готово!",
                         request_timeout=180
                     )
                     print(f"✅ Фото успешно отправлено! Message ID: {sent_message.message_id}")
-                    
+
                     print(f"🗑️ Удаляем сообщение о генерации...")
                     await processing_msg.delete()
                     print(f"✅ Сообщение удалено")
 
                     print(f"💾 Сохраняем генерацию в БД...")
-                    db.save_generation(message.from_user.id, "image_editing", image_url, prompt)
+                    db.save_generation(user_id, "image_editing", image_url, prompt)
                     print(f"✅ Генерация сохранена в БД")
                     
                     print(f"\n{'='*70}")
@@ -396,10 +489,12 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                     await processing_msg.edit_text(
                         "❌ Не удалось отправить изображение. Попробуйте позже."
                     )
-            
+
+
             # Автоматически открываем главное меню
-            await message.answer(
-                TEXTS['welcome_message'],
+            await bot.send_message(
+                chat_id=chat_id,
+                text=TEXTS['welcome_message'],
                 reply_markup=get_main_menu_keyboard(),
                 parse_mode="HTML"
             )
@@ -412,10 +507,11 @@ async def process_edit_description(message: Message, state: FSMContext, bot: Bot
                 "💡 Попробуйте ещё раз через пару минут\n\n"
                 "💛 Не переживайте, генерация не списана"
             )
-            
+
             # Автоматически открываем главное меню
-            await message.answer(
-                TEXTS['welcome_message'],
+            await bot.send_message(
+                chat_id=chat_id,
+                text=TEXTS['welcome_message'],
                 reply_markup=get_main_menu_keyboard(),
                 parse_mode="HTML"
             )
