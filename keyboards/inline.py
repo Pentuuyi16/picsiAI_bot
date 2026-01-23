@@ -49,6 +49,7 @@ def get_video_menu_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="📸 Оживить фото", callback_data="photo_animation"),
                 InlineKeyboardButton(text="🎥 Создать видео", callback_data="video_generation")
             ],
+            [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_video")],
             [InlineKeyboardButton(text="← Главное меню", callback_data="main_menu")]
         ]
     )
@@ -206,7 +207,6 @@ def get_cabinet_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🎨 Мои отредактированные изображения", callback_data="my_edited_images")],
             [InlineKeyboardButton(text="🕺 Мои управление движением", callback_data="my_motion_videos")],
             [InlineKeyboardButton(text="💎 Реферальная система", callback_data="referral_system")],
-            [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_cabinet")],
             [InlineKeyboardButton(text="Документы", callback_data="documents")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ]
