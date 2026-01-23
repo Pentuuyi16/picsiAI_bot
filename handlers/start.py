@@ -116,6 +116,95 @@ async def main_menu_handler(callback):
     await callback.answer()
 
 
+@router.callback_query(lambda c: c.data == "images_menu")
+async def images_menu_handler(callback):
+    """Обработчик кнопки 'Изображения'"""
+    from keyboards.inline import get_images_menu_keyboard
+    from database.database import Database
+
+    user_id = callback.from_user.id
+    db = Database()
+    generations = db.get_user_generations(user_id)
+
+    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
+    if generations == 1 and not db.has_purchased_generations(user_id):
+        generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
+    generation_text += "</blockquote>"
+
+    text = (
+        "<b>🖼️ Работа с изображениями</b>\n\n"
+        "Выберите, что хотите сделать с фото:\n\n"
+        "🔥 <b>Тренды</b> — популярные эффекты и стили\n"
+        "🎨 <b>Отредактировать фото</b> — изменить изображение по вашему описанию\n\n"
+        f"{generation_text}"
+    )
+
+    # Пытаемся отредактировать сообщение
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=get_images_menu_keyboard(),
+            parse_mode="HTML"
+        )
+    except:
+        # Если не получилось, удаляем и отправляем новое
+        try:
+            await callback.message.delete()
+        except:
+            pass
+
+        await callback.message.answer(
+            text,
+            reply_markup=get_images_menu_keyboard(),
+            parse_mode="HTML"
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(lambda c: c.data == "video_menu")
+async def video_menu_handler(callback):
+    """Обработчик кнопки 'Видео и анимация'"""
+    from keyboards.inline import get_video_menu_keyboard
+    from database.database import Database
+
+    user_id = callback.from_user.id
+    db = Database()
+    user = db.get_user(user_id)
+    balance = user['balance'] if user else 0.00
+
+    text = (
+        "<b>🎬 Видео и анимация</b>\n\n"
+        "Создавайте видеоконтент с помощью ИИ:\n\n"
+        "📸 <b>Оживить фото</b> — превратите фотографию в короткое видео\n"
+        "🎥 <b>Создать видео</b> — сгенерируйте видео по описанию или фото\n"
+        "🕺 <b>Управление движением</b> — добавьте движение на фото (Kling)\n\n"
+        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽</blockquote>"
+    )
+
+    # Пытаемся отредактировать сообщение
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=get_video_menu_keyboard(),
+            parse_mode="HTML"
+        )
+    except:
+        # Если не получилось, удаляем и отправляем новое
+        try:
+            await callback.message.delete()
+        except:
+            pass
+
+        await callback.message.answer(
+            text,
+            reply_markup=get_video_menu_keyboard(),
+            parse_mode="HTML"
+        )
+
+    await callback.answer()
+
+
 @router.message(Command("menu"))
 async def menu_command_handler(message: Message):
     """Обработчик команды /menu"""

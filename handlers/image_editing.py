@@ -3,9 +3,9 @@ from aiogram.types import CallbackQuery, Message, URLInputFile, BufferedInputFil
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from keyboards.inline import (
-    get_image_editing_keyboard, 
+    get_image_editing_keyboard,
     get_edit_aspect_ratio_keyboard,
-    get_main_menu_keyboard
+    get_images_menu_keyboard
 )
 from utils.nano_banana_edit_client import NanoBananaEditClient
 from utils.texts import TEXTS
@@ -491,11 +491,26 @@ async def process_edit_model(callback: CallbackQuery, state: FSMContext, bot: Bo
                     )
 
 
-            # Автоматически открываем главное меню
+            # Возвращаемся в меню изображений
+            from database.database import Database
+            db = Database()
+            generations = db.get_user_generations(user_id)
+
+            generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
+            if generations == 1 and not db.has_purchased_generations(user_id):
+                generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
+            generation_text += "</blockquote>"
+
             await bot.send_message(
                 chat_id=chat_id,
-                text=TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
+                text=(
+                    "<b>🖼️ Работа с изображениями</b>\n\n"
+                    "Выберите, что хотите сделать с фото:\n\n"
+                    "🔥 <b>Тренды</b> — популярные эффекты и стили\n"
+                    "🎨 <b>Отредактировать фото</b> — изменить изображение по вашему описанию\n\n"
+                    f"{generation_text}"
+                ),
+                reply_markup=get_images_menu_keyboard(),
                 parse_mode="HTML"
             )
         else:
@@ -508,11 +523,26 @@ async def process_edit_model(callback: CallbackQuery, state: FSMContext, bot: Bo
                 "💛 Не переживайте, генерация не списана"
             )
 
-            # Автоматически открываем главное меню
+            # Возвращаемся в меню изображений
+            from database.database import Database
+            db = Database()
+            generations = db.get_user_generations(user_id)
+
+            generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
+            if generations == 1 and not db.has_purchased_generations(user_id):
+                generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
+            generation_text += "</blockquote>"
+
             await bot.send_message(
                 chat_id=chat_id,
-                text=TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
+                text=(
+                    "<b>🖼️ Работа с изображениями</b>\n\n"
+                    "Выберите, что хотите сделать с фото:\n\n"
+                    "🔥 <b>Тренды</b> — популярные эффекты и стили\n"
+                    "🎨 <b>Отредактировать фото</b> — изменить изображение по вашему описанию\n\n"
+                    f"{generation_text}"
+                ),
+                reply_markup=get_images_menu_keyboard(),
                 parse_mode="HTML"
             )
     

@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery, Message, URLInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from keyboards.inline import get_video_generation_keyboard, get_video_format_keyboard, get_aspect_ratio_keyboard, get_main_menu_keyboard
+from keyboards.inline import get_video_generation_keyboard, get_video_format_keyboard, get_aspect_ratio_keyboard, get_video_menu_keyboard
 from utils.veo_api_client import VeoApiClient
 from utils.texts import TEXTS
 import logging
@@ -442,7 +442,7 @@ async def process_video_description(message: Message, state: FSMContext, bot: Bo
             # Автоматически открываем главное меню
             await message.answer(
                 TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
+                reply_markup=get_video_menu_keyboard(),
                 parse_mode="HTML"
             )
         else:
@@ -458,7 +458,7 @@ async def process_video_description(message: Message, state: FSMContext, bot: Bo
             # Автоматически открываем главное меню
             await message.answer(
                 TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
+                reply_markup=get_video_menu_keyboard(),
                 parse_mode="HTML"
         )
     

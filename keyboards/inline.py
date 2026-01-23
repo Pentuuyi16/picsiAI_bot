@@ -15,15 +15,35 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
     """Создаёт главное меню с инлайн-кнопками"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🔥 Тренды", callback_data="trends")],
-            [InlineKeyboardButton(text="🎨 Редактирование изображений", callback_data="image_editing")],
-            [
-                InlineKeyboardButton(text="📸 Оживление фото", callback_data="photo_animation"),
-                InlineKeyboardButton(text="🎬 Создание видео", callback_data="video_generation")
-            ],
-            [InlineKeyboardButton(text="🕺 Управление движением(Kling)", callback_data="motion_control")],
+            [InlineKeyboardButton(text="🖼️ Изображения", callback_data="images_menu")],
+            [InlineKeyboardButton(text="🎬 Видео и анимация", callback_data="video_menu")],
             [InlineKeyboardButton(text="Написать в поддержку", callback_data="support")],
             [InlineKeyboardButton(text="Личный кабинет", callback_data="personal_cabinet")]
+        ]
+    )
+    return keyboard
+
+
+def get_images_menu_keyboard() -> InlineKeyboardMarkup:
+    """Создаёт подменю 'Изображения'"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔥 Тренды", callback_data="trends")],
+            [InlineKeyboardButton(text="🎨 Отредактировать фото", callback_data="image_editing")],
+            [InlineKeyboardButton(text="← Главное меню", callback_data="main_menu")]
+        ]
+    )
+    return keyboard
+
+
+def get_video_menu_keyboard() -> InlineKeyboardMarkup:
+    """Создаёт подменю 'Видео и анимация'"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📸 Оживить фото", callback_data="photo_animation")],
+            [InlineKeyboardButton(text="🎥 Создать видео", callback_data="video_generation")],
+            [InlineKeyboardButton(text="🕺 Управление движением", callback_data="motion_control")],
+            [InlineKeyboardButton(text="← Главное меню", callback_data="main_menu")]
         ]
     )
     return keyboard
@@ -36,7 +56,7 @@ def get_photo_animation_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📸 Оживить фото", callback_data="animate_photo")],
             [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction")],
             [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_photo")],
-            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            [InlineKeyboardButton(text="← Назад", callback_data="video_menu")]
         ]
     )
     return keyboard
@@ -49,7 +69,7 @@ def get_video_generation_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📹 Сгенерировать видео", callback_data="generate_video")],
             [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_generation")],
             [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_video")],
-            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            [InlineKeyboardButton(text="← Назад", callback_data="video_menu")]
         ]
     )
     return keyboard
@@ -116,7 +136,7 @@ def get_image_editing_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🎨 Отредактировать фото", callback_data="edit_photo")],
             [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_editing")],
             [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
-            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            [InlineKeyboardButton(text="← Назад", callback_data="images_menu")]
         ]
     )
     return keyboard
@@ -194,7 +214,7 @@ def get_motion_control_keyboard():
             [InlineKeyboardButton(text="🕺 Управлять движением", callback_data="control_motion")],
             [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_motion")],
             [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_motion")],
-            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            [InlineKeyboardButton(text="← Назад", callback_data="video_menu")]
         ]
     )
     return keyboard
@@ -239,7 +259,7 @@ def get_trends_keyboard(page: int = 1) -> InlineKeyboardMarkup:
             ],
             [InlineKeyboardButton(text="Следующая страница →", callback_data="trends_page_2")],
             [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
-            [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
+            [InlineKeyboardButton(text="← Назад", callback_data="images_menu")]
         ]
     )
     return keyboard

@@ -84,7 +84,7 @@ async def trends_page_2_handler(callback: CallbackQuery):
                 [InlineKeyboardButton(text="Я аватар", callback_data="trend_avatar")],
                 [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations")],
                 [InlineKeyboardButton(text="← Предыдущая страница", callback_data="trends")],
-                [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+                [InlineKeyboardButton(text="← Назад", callback_data="images_menu")]
             ]
         )
     )

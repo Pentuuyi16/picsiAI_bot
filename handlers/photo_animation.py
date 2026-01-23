@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery, Message, URLInputFile, FSInputFile
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from keyboards.inline import get_photo_animation_keyboard, get_main_menu_keyboard
+from keyboards.inline import get_photo_animation_keyboard, get_video_menu_keyboard
 from utils.api_client import KieApiClient
 from utils.texts import TEXTS
 import os
@@ -279,7 +279,7 @@ async def process_prompt(message: Message, state: FSMContext, bot: Bot):
             # Автоматически открываем главное меню
             await message.answer(
                 TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
+                reply_markup=get_video_menu_keyboard(),
                 parse_mode="HTML"
             )
         else:
@@ -295,7 +295,7 @@ async def process_prompt(message: Message, state: FSMContext, bot: Bot):
             # Автоматически открываем главное меню
             await message.answer(
                 TEXTS['welcome_message'],
-                reply_markup=get_main_menu_keyboard(),
+                reply_markup=get_video_menu_keyboard(),
                 parse_mode="HTML"
             )
     
