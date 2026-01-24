@@ -2,11 +2,11 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from keyboards.inline import (
-    get_balance_amounts_keyboard, 
-    get_payment_keyboard, 
-    get_photo_animation_keyboard, 
+    get_balance_amounts_keyboard,
+    get_payment_keyboard,
+    get_photo_animation_keyboard,
     get_video_generation_keyboard,
-    get_image_editing_keyboard,
+    get_images_menu_keyboard,
     get_start_action_keyboard,
     get_edit_aspect_ratio_keyboard,
     get_video_format_keyboard,
@@ -271,43 +271,48 @@ async def back_to_video_generation_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "back_to_image_editing")
 async def back_to_image_editing_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Назад' - возврат в раздел редактирования изображений"""
+    """Обработчик кнопки 'Назад' - возврат в меню изображений"""
     from database.database import Database
-    from keyboards.inline import get_image_editing_keyboard
-    
+    from keyboards.inline import get_images_menu_keyboard
+
     user_id = callback.from_user.id
-    
-    # Получаем баланс из БД
+
+    # Получаем количество генераций
     db = Database()
-    user = db.get_user(user_id)
-    balance = user['balance'] if user else 0.00
-    
+    generations = db.get_user_generations(user_id)
+
+    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
+    if generations == 1 and not db.has_purchased_generations(user_id):
+        generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
+    generation_text += "</blockquote>"
+
     text = (
-        "✨ <b>Наш бот помогает преобразить изображения и раскрыть их по-новому!</b>\n\n"
-        "<b>Как отредактировать изображение?</b>\n\n"
-        "1️⃣ <b><i>Загрузите фото</i></b>, которое хотите изменить.\n"
-        "2️⃣ <b><i>Опишите желаемые правки</i></b> — улучшение качества, изменение деталей или общего настроения.\n"
-        "3️⃣ <b><i>Подождите всего пару минут</i></b> — и получите изображение с качественным редактированием.\n\n"
-        "Ваши <b><i>фото</i></b> могут выглядеть ещё лучше 💫\n\n"
-        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"🎨 Редактирование 1 изображения = 15₽</blockquote>"
+        "<b>🖼️ Работа с изображениями</b>\n\n"
+        "✨ <b>Создать фото</b> — генерация изображений с нуля\n"
+        "🎨 <b>Отредактировать фото</b> — изменить изображение по описанию\n\n"
+        f"{generation_text}"
     )
-    
-    # Удаляем старое сообщение
+
+    # Пытаемся отредактировать сообщение
     try:
-        await callback.message.delete()
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=get_images_menu_keyboard()
+        )
     except:
-        pass
-    
-    # Отправляем новое с видео
-    from handlers.image_editing import EXAMPLE_VIDEO_FILE_ID
-    await callback.bot.send_video(
-        chat_id=callback.message.chat.id,
-        video=EXAMPLE_VIDEO_FILE_ID,
-        caption=text,
-        parse_mode="HTML",
-        reply_markup=get_image_editing_keyboard()
-    )
+        # Если не получилось, удаляем и отправляем новое
+        try:
+            await callback.message.delete()
+        except:
+            pass
+
+        await callback.message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=get_images_menu_keyboard()
+        )
+
     await callback.answer()
 
 

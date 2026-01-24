@@ -3,7 +3,6 @@ from aiogram.types import CallbackQuery, Message, URLInputFile, BufferedInputFil
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from keyboards.inline import (
-    get_image_editing_keyboard,
     get_edit_aspect_ratio_keyboard,
     get_images_menu_keyboard
 )
@@ -102,53 +101,46 @@ async def compress_image(image_url: str, max_size_mb: float = 10.0, quality: int
 
 
 @router.callback_query(F.data == "image_editing")
-async def image_editing_handler(callback: CallbackQuery):
+async def image_editing_handler(callback: CallbackQuery, state: FSMContext):
     """Обработчик кнопки 'Редактирование изображений'"""
     from database.database import Database
-    
+
     user_id = callback.from_user.id
-    
+
     # Получаем количество генераций
     db = Database()
     generations = db.get_user_generations(user_id)
-    
+
     generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
     if generations == 1 and not db.has_purchased_generations(user_id):
         generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
     generation_text += "</blockquote>"
-    
+
     text = (
-        "✨ <b>Наш бот помогает преобразить изображения и раскрыть их по-новому!</b>\n\n"
-        "<b>Как отредактировать изображение?</b>\n\n"
-        "1️⃣ <b><i>Загрузите фото</i></b>, которое хотите изменить.\n"
-        "2️⃣ <b><i>Опишите желаемые правки</i></b> — улучшение качества, изменение деталей или общего настроения.\n"
-        "3️⃣ <b><i>Подождите всего пару минут</i></b> — и получите изображение с качественным редактированием.\n\n"
-        "Ваши <b><i>фото</i></b> могут выглядеть ещё лучше 💫\n\n"
+        "📐 Выберите соотношение сторон для редактирования:\n\n"
         f"{generation_text}"
     )
-    
-    # Удаляем старое сообщение
-    await callback.message.delete()
-    
-    # Отправляем новое с видео
-    await callback.message.answer_video(
-        video=EXAMPLE_VIDEO_FILE_ID,
-        caption=text,
-        parse_mode="HTML",
-        reply_markup=get_image_editing_keyboard()
-    )
-    
-    await callback.answer()
 
+    # Пытаемся отредактировать сообщение
+    try:
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=get_edit_aspect_ratio_keyboard()
+        )
+    except:
+        # Если не получилось (например, сообщение с видео), удаляем и отправляем новое
+        try:
+            await callback.message.delete()
+        except:
+            pass
 
-@router.callback_query(F.data == "edit_photo")
-async def edit_image_handler(callback: CallbackQuery, state: FSMContext):
-    """Обработчик кнопки 'Редактировать изображение'"""
-    await callback.message.answer(
-        "📐 Выберите <b><i>соотношение</i></b> сторон для редактирования:",
-        parse_mode="HTML",
-        reply_markup=get_edit_aspect_ratio_keyboard()
-    )
+        await callback.message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=get_edit_aspect_ratio_keyboard()
+        )
+
     await state.set_state(ImageEditingStates.waiting_for_aspect_ratio)
     await callback.answer()
 
@@ -565,13 +557,6 @@ async def back_to_edit_aspect_handler(callback: CallbackQuery, state: FSMContext
     )
     await state.set_state(ImageEditingStates.waiting_for_aspect_ratio)
     await callback.answer()
-
-
-@router.callback_query(F.data == "back_to_image_editing_menu")
-async def back_to_image_editing_menu_handler(callback: CallbackQuery, state: FSMContext):
-    """Обработчик кнопки 'Назад в меню редактирования'"""
-    await state.clear()
-    await image_editing_handler(callback)
 
 
 @router.callback_query(F.data == "video_instruction_editing")

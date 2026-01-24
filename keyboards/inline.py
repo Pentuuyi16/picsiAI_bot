@@ -136,18 +136,6 @@ def get_payment_keyboard(amount: int) -> InlineKeyboardMarkup:
     )
     return keyboard
 
-def get_image_editing_keyboard() -> InlineKeyboardMarkup:
-    """Создаёт клавиатуру для раздела 'Редактирование изображений'"""
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🎨 Отредактировать фото", callback_data="edit_photo")],
-            [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_editing")],
-            [InlineKeyboardButton(text="⚡ Купить генерации", callback_data="buy_generations_from_editing")],
-            [InlineKeyboardButton(text="← Назад", callback_data="images_menu")]
-        ]
-    )
-    return keyboard
-
 def get_edit_aspect_ratio_keyboard() -> InlineKeyboardMarkup:
     """Создаёт клавиатуру для выбора соотношения сторон при редактировании"""
     keyboard = InlineKeyboardMarkup(
@@ -155,8 +143,7 @@ def get_edit_aspect_ratio_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="16:9 Горизонтальное", callback_data="edit_aspect_16_9")],
             [InlineKeyboardButton(text="9:16 Вертикальное", callback_data="edit_aspect_9_16")],
             [InlineKeyboardButton(text="1:1 Квадратное", callback_data="edit_aspect_1_1")],
-            [InlineKeyboardButton(text="Назад", callback_data="back_to_image_editing_menu")],
-            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+            [InlineKeyboardButton(text="← Назад", callback_data="images_menu")]
         ]
     )
     return keyboard
