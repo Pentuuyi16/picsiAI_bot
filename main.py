@@ -17,12 +17,42 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ВРЕМЕННЫЙ ОБРАБОТЧИК ДЛЯ ПОЛУЧЕНИЯ FILE_ID
+async def get_file_id_handler(message: Message):
+    """Временный обработчик для получения file_id фото и видео"""
+    
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        file_type = "PHOTO"
+    elif message.video:
+        file_id = message.video.file_id
+        file_type = "VIDEO"
+    else:
+        return
+    
+    await message.answer(
+        f"<b>📎 {file_type} FILE_ID:</b>\n\n"
+        f"<code>{file_id}</code>\n\n"
+        f"<i>Скопируйте этот ID для использования в коде</i>",
+        parse_mode="HTML"
+    )
+    
+    print(f"\n{'='*70}")
+    print(f"📎 {file_type} FILE_ID")
+    print(f"{'='*70}")
+    print(f"{file_id}")
+    print(f"{'='*70}\n")
+
+
 async def main():
     """Главная функция запуска бота"""
     # Создаём бота и диспетчер
     bot = Bot(token=BOT_TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+    
+    # РЕГИСТРИРУЕМ ВРЕМЕННЫЙ ОБРАБОТЧИК
+    dp.message.register(get_file_id_handler, F.photo | F.video)
     
     # Настраиваем команды бота (меню)
     commands = [
@@ -66,4 +96,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("⛔ Бот остановлен")
-
