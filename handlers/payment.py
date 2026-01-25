@@ -573,6 +573,7 @@ async def start_action_handler(callback: CallbackQuery):
     from utils.api_client import KieApiClient
     from utils.veo_api_client import VeoApiClient
     from utils.image_edit_client import ImageEditClient
+    from utils.nano_banana_client import NanoBananaClient
     from utils.motion_control_client import MotionControlClient
     import json
     import logging
@@ -800,15 +801,17 @@ async def start_action_handler(callback: CallbackQuery):
         # Редактирование изображения
         state_data = action_data.get("state_data", {})
         prompt = action_data.get("prompt")
+        model_type = action_data.get("model_type", "standard")
         
         aspect_ratio = state_data.get("edit_aspect_ratio", "1:1")
-        resolution = state_data.get("edit_quality", "1K")
         photos = state_data.get("edit_photos", [])
         
-        required_amount = 15.00
+        generations_cost = 1 if model_type == "standard" else 4
         
-        if balance < required_amount:
-            await callback.message.answer("❌ Недостаточно средств для редактирования изображения")
+        generations = db.get_user_generations(user_id)
+        
+        if generations < generations_cost:
+            await callback.message.answer("❌ Недостаточно генераций для редактирования изображения")
             return
         
         processing_msg = await callback.message.answer(
@@ -816,55 +819,59 @@ async def start_action_handler(callback: CallbackQuery):
         )
         
         try:
-            edit_client = ImageEditClient()
-            
-            task_id = await edit_client.create_edit_task(
-                prompt=prompt,
-                image_urls=photos,
-                aspect_ratio=aspect_ratio,
-                resolution=resolution,
-                output_format="png"
-            )
+            if model_type == "standard":
+                from utils.nano_banana_edit_client import NanoBananaEditClient
+                edit_client = NanoBananaEditClient()
+                task_id = await edit_client.create_edit_task(
+                    prompt=prompt,
+                    image_urls=photos,
+                    image_size=aspect_ratio,
+                    output_format="png"
+                )
+            else:
+                edit_client = ImageEditClient()
+                task_id = await edit_client.create_edit_task(
+                    prompt=prompt,
+                    image_urls=photos,
+                    aspect_ratio=aspect_ratio,
+                    resolution="2K",
+                    output_format="png"
+                )
             
             if task_id:
-                image_url = await edit_client.wait_for_result(task_id, max_attempts=120, delay=5)
+                if model_type == "pro":
+                    async def update_progress(elapsed_min, remaining_min):
+                        try:
+                            await processing_msg.edit_text(
+                                f"⭐ Идет редактирование в высоком качестве...\n\n"
+                                f"⏱️ Прошло: {elapsed_min} мин\n⏳ Осталось примерно: {remaining_min} мин\n\n"
+                                f"💡 Профессиональная модель создает изображения в 4K"
+                            )
+                        except:
+                            pass
+                    image_url = await edit_client.wait_for_result(task_id, max_attempts=240, delay=5, progress_callback=update_progress)
+                else:
+                    image_url = await edit_client.wait_for_result(task_id, max_attempts=120, delay=5)
                 
                 if image_url:
                     if image_url == "MODERATION_ERROR":
                         # Ошибка модерации - баланс НЕ списывается
                         await processing_msg.edit_text(
                             "😔 Упс! Не получилось отредактировать изображение\n\n"
-                            "Система безопасности заблокировала запрос.\n\n"
-                            "Частые причины:\n"
-                            "• На фото известная личность\n"
-                            "• В описании есть неподходящий контент\n\n"
-                            "💡 Совет: используйте обычные фотографии и нейтральные описания\n\n"
-                            "💛 Не переживайте, баланс не пострадал"
+                            "Система безопасности заблокировала запрос.\n\n💛 Не переживайте, генерация не списана"
                         )
                     else:
-                        # Успешная генерация - списываем средства
-                        new_balance = balance - required_amount
-                        db.update_user_balance(user_id, new_balance)
+                        db.subtract_generations(user_id, generations_cost)
                         
                         # Отправляем изображение
                         try:
-                            print(f"\n{'='*70}")
-                            print(f"📤 ОТПРАВКА ИЗОБРАЖЕНИЯ")
-                            print(f"Image URL: {image_url}")
-                            print(f"{'='*70}\n")
-                            
-                            # Сжимаем изображение
                             compressed_image = await compress_image(image_url, max_size_mb=9.0, quality=85)
-                            
-                            print(f"📤 Отправляем сжатое изображение...")
                             await callback.bot.send_photo(
                                 chat_id=callback.message.chat.id,
                                 photo=compressed_image,
                                 caption="✨ Ваше изображение готово!",
                                 request_timeout=180
                             )
-                            print(f"✅ Изображение отправлено!")
-                            
                             await processing_msg.delete()
                             
                             db.save_generation(user_id, "image_editing", image_url, prompt)
@@ -882,17 +889,8 @@ async def start_action_handler(callback: CallbackQuery):
                 else:
                     await processing_msg.edit_text(
                         "😔 Что-то пошло не так\n\n"
-                        "Не удалось отредактировать изображение. Возможные причины:\n"
-                        "• Превышено время ожидания\n"
-                        "• Временные проблемы с сервером\n\n"
-                        "💡 Попробуйте ещё раз через пару минут\n\n"
-                        "💛 Не переживайте, баланс не пострадал"
-                    )
-                    
-                    await callback.message.answer(
-                        TEXTS['welcome_message'],
-                        reply_markup=get_main_menu_keyboard(),
-                        parse_mode="HTML"
+                        "Не удалось отредактировать изображение. Попробуйте позже.\n\n"
+                        "💛 Не переживайте, генерация не списана"
                     )
             else:
                 await processing_msg.edit_text("❌ Не удалось создать задачу.")
@@ -902,6 +900,106 @@ async def start_action_handler(callback: CallbackQuery):
                 await processing_msg.edit_text("❌ Произошла ошибка при редактировании.")
             except:
                 await callback.message.answer("❌ Произошла ошибка при редактировании.")
+    
+    elif action_type == "image_generation_pending":
+        # Генерация изображения
+        state_data = action_data.get("state_data", {})
+        prompt = action_data.get("prompt")
+        
+        aspect_ratio = state_data.get("generation_aspect_ratio", "1:1")
+        model_type = action_data.get("model_type", "standard")
+        
+        generations_cost = 1 if model_type == "standard" else 4
+        
+        generations = db.get_user_generations(user_id)
+        
+        if generations < generations_cost:
+            await callback.message.answer("❌ Недостаточно генераций для создания изображения")
+            return
+        
+        processing_msg = await callback.message.answer(
+            "⭐ Начинается генерация изображения, совсем скоро пришлем результат"
+        )
+        
+        try:
+            if model_type == "standard":
+                generation_client = NanoBananaClient()
+                task_id = await generation_client.create_generation_task(
+                    prompt=prompt,
+                    image_size=aspect_ratio,
+                    output_format="png",
+                    model="google/nano-banana"
+                )
+            else:
+                generation_client = ImageEditClient()
+                task_id = await generation_client.create_edit_task(
+                    prompt=prompt,
+                    image_urls=[],
+                    aspect_ratio=aspect_ratio,
+                    resolution="2K",
+                    output_format="png"
+                )
+            
+            if task_id:
+                if model_type == "pro":
+                    async def update_progress(elapsed_min, remaining_min):
+                        try:
+                            await processing_msg.edit_text(
+                                f"⭐ Идет генерация в высоком качестве...\n\n"
+                                f"⏱️ Прошло: {elapsed_min} мин\n⏳ Осталось примерно: {remaining_min} мин\n\n"
+                                f"💡 Профессиональная модель создает изображения в 4K"
+                            )
+                        except:
+                            pass
+                    image_url = await generation_client.wait_for_result(task_id, max_attempts=240, delay=5, progress_callback=update_progress)
+                else:
+                    image_url = await generation_client.wait_for_result(task_id, max_attempts=120, delay=5)
+                
+                if image_url:
+                    if image_url == "MODERATION_ERROR":
+                        await processing_msg.edit_text(
+                            "😔 Упс! Не получилось создать изображение\n\n"
+                            "Система безопасности заблокировала запрос.\n\n💛 Не переживайте, генерация не списана"
+                        )
+                    else:
+                        db.subtract_generations(user_id, generations_cost)
+                        
+                        try:
+                            compressed_image = await compress_image(image_url, max_size_mb=9.5, quality=85)
+                            await callback.bot.send_photo(
+                                chat_id=callback.message.chat.id,
+                                photo=compressed_image,
+                                caption="✨ Ваше изображение готово!",
+                                request_timeout=180
+                            )
+                            await processing_msg.delete()
+                            
+                            db.save_generation(user_id, "image_generation", image_url, prompt)
+                        except Exception as e:
+                            logger.error(f"Ошибка отправки изображения: {e}")
+                            await processing_msg.edit_text(
+                                "❌ Не удалось отправить изображение. Попробуйте позже."
+                            )
+                    
+                    await callback.message.answer(
+                        TEXTS['welcome_message'],
+                        reply_markup=get_main_menu_keyboard(),
+                        parse_mode="HTML"
+                    )
+                else:
+                    await processing_msg.edit_text(
+                        "😔 Что-то пошло не так\n\n"
+                        "Не удалось создать изображение. Попробуйте позже.\n\n"
+                        "💛 Не переживайте, генерация не списана"
+                    )
+            else:
+                await processing_msg.edit_text("❌ Не удалось создать задачу.")
+        except Exception as e:
+            logger.error(f"Ошибка: {e}", exc_info=True)
+            try:
+                await processing_msg.edit_text("❌ Произошла ошибка при генерации.")
+            except:
+                await callback.message.answer("❌ Произошла ошибка при генерации.")
     
     elif action_type == "motion_control_pending":
         # Управление движением
@@ -988,3 +1086,11 @@ async def start_action_handler(callback: CallbackQuery):
     
     # Очищаем pending action после выполнения
     db.clear_pending_action(user_id)
+
+
+@router.callback_query(F.data == "buy_generations_from_generation")
+async def buy_generations_from_generation_handler(callback: CallbackQuery):
+    """Обработчик кнопки 'Купить генерации' из раздела генерации изображений"""
+    # Перенаправляем на покупку генераций
+    from handlers.generation_purchase import buy_generations_handler
+    await buy_generations_handler(callback)

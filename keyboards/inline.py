@@ -148,6 +148,18 @@ def get_edit_aspect_ratio_keyboard() -> InlineKeyboardMarkup:
     )
     return keyboard
 
+def get_generation_aspect_ratio_keyboard() -> InlineKeyboardMarkup:
+    """Создаёт клавиатуру для выбора соотношения сторон при генерации"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="16:9 Горизонтальное", callback_data="generation_aspect_16_9")],
+            [InlineKeyboardButton(text="9:16 Вертикальное", callback_data="generation_aspect_9_16")],
+            [InlineKeyboardButton(text="1:1 Квадратное", callback_data="generation_aspect_1_1")],
+            [InlineKeyboardButton(text="← Назад", callback_data="images_menu")]
+        ]
+    )
+    return keyboard
+
 def get_photo_quality_keyboard() -> InlineKeyboardMarkup:
     """Создаёт клавиатуру для выбора качества фото"""
     keyboard = InlineKeyboardMarkup(

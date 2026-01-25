@@ -117,10 +117,15 @@ class NanoBananaEditClient:
             elif state == "fail":
                 fail_msg = status_data.get("failMsg", "Unknown error")
                 fail_code = status_data.get("failCode", "")
-                print(f"❌ Failed: {fail_msg}")
-                
+                print(f"❌ Failed: {fail_msg} (code: {fail_code})")
+
+                # Проверяем код 501 (Google модерация)
+                if str(fail_code) == "501":
+                    print(f"🚫 Контент заблокирован модерацией Google (код 501)")
+                    return "MODERATION_ERROR"
+
                 fail_msg_lower = str(fail_msg).lower()
-                if ("nsfw" in fail_msg_lower or "inappropriate" in fail_msg_lower or "prominent people" in fail_msg_lower or "violating content" in fail_msg_lower or str(fail_code) in ["400", "422", "500"]):
+                if ("nsfw" in fail_msg_lower or "inappropriate" in fail_msg_lower or "prominent people" in fail_msg_lower or "violating content" in fail_msg_lower or "violated google" in fail_msg_lower or "prohibited use policy" in fail_msg_lower or str(fail_code) in ["400", "422", "500"]):
                     return "MODERATION_ERROR"
                 
                 return None

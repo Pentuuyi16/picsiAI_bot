@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.types import BotCommand, Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
-from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support, motion_control, generation_purchase
+from handlers import start, photo_animation, video_generation, payment, image_editing, referral, cabinet, support, motion_control, generation_purchase,image_generation
 from handlers.trends import router as trends_router
 from webhook_server import start_webhook_server
 
@@ -39,7 +39,8 @@ async def main():
     dp.include_router(motion_control.router)
     dp.include_router(photo_animation.router)
     dp.include_router(video_generation.router)
-    dp.include_router(image_editing.router)
+    dp.include_router(image_generation.router)  # Должен быть перед image_editing!
+    dp.include_router(image_editing.router) 
     dp.include_router(payment.router)
     dp.include_router(referral.router)
     dp.include_router(cabinet.router)

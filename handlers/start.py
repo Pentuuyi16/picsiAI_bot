@@ -204,18 +204,6 @@ async def video_menu_handler(callback):
     await callback.answer()
 
 
-@router.callback_query(lambda c: c.data == "create_photo")
-async def create_photo_handler(callback):
-    """Обработчик кнопки 'Создать фото' (временно)"""
-    from keyboards.inline import get_images_menu_keyboard
-
-    await callback.message.answer(
-        "🚧 <b>Раздел в разработке</b>\n\n"
-        "Скоро здесь появится возможность создавать фото с помощью ИИ!",
-        parse_mode="HTML",
-        reply_markup=get_images_menu_keyboard()
-    )
-    await callback.answer()
 
 
 @router.message(Command("menu"))

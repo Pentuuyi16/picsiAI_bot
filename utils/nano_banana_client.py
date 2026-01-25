@@ -5,8 +5,8 @@ from typing import Optional, Callable
 from config import KIE_API_KEY
 
 
-class ImageEditClient:
-    """Клиент для работы с API редактирования изображений (nano-banana-pro)"""
+class NanoBananaClient:
+    """Клиент для работы с API генерации изображений Nano Banana"""
     
     def __init__(self):
         self.api_key = KIE_API_KEY
@@ -16,31 +16,28 @@ class ImageEditClient:
             "Content-Type": "application/json"
         }
     
-    async def create_edit_task(
+    async def create_generation_task(
         self,
         prompt: str,
-        image_urls: list,
-        aspect_ratio: str = "1:1",
-        resolution: str = "1K",
-        output_format: str = "png"
+        image_size: str = "1:1",
+        output_format: str = "png",
+        model: str = "google/nano-banana"
     ) -> Optional[str]:
-        """Создаёт задачу на редактирование изображения"""
+        """Создаёт задачу на генерацию изображения"""
         url = f"{self.base_url}/api/v1/jobs/createTask"
         
-        # ИСПРАВЛЕНО: правильная структура по документации
         payload = {
-            "model": "nano-banana-pro",
+            "model": model,
             "input": {
                 "prompt": prompt,
-                "image_input": image_urls,  # Это уже список!
-                "aspect_ratio": aspect_ratio,
-                "resolution": resolution,
+                "image_size": image_size,
                 "output_format": output_format
             }
         }
         
-        print(f"📤 Отправка запроса на редактирование изображения:")
+        print(f"📤 Отправка запроса на генерацию изображения:")
         print(f"   URL: {url}")
+        print(f"   Model: {model}")
         print(f"   Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
         
         try:
@@ -68,7 +65,7 @@ class ImageEditClient:
             return None
     
     async def get_task_status(self, task_id: str) -> Optional[dict]:
-        """Получает статус задачи редактирования"""
+        """Получает статус задачи генерации"""
         url = f"{self.base_url}/api/v1/jobs/recordInfo"
         
         params = {
@@ -98,7 +95,7 @@ class ImageEditClient:
         progress_callback: Optional[Callable] = None
     ) -> Optional[str]:
         """
-        Ожидает завершения редактирования изображения
+        Ожидает завершения генерации изображения
         
         Args:
             task_id: ID задачи
@@ -112,7 +109,7 @@ class ImageEditClient:
             "TIMEOUT_ERROR" если таймаут от API
             None если другая ошибка
         """
-        print(f"⏳ Ожидание завершения редактирования задачи {task_id}...")
+        print(f"⏳ Ожидание завершения генерации задачи {task_id}...")
         print(f"   Максимальное время ожидания: {max_attempts * delay // 60} минут")
         
         for attempt in range(max_attempts):
@@ -137,7 +134,7 @@ class ImageEditClient:
                         print(f"⚠️ Ошибка при отправке прогресса: {e}")
             
             if state == "success":
-                print("🎉 Редактирование завершено!")
+                print("🎉 Генерация завершена!")
                 
                 result_json_str = status_data.get("resultJson")
                 
@@ -164,11 +161,11 @@ class ImageEditClient:
             elif state == "fail":
                 fail_msg = status_data.get("failMsg", "Неизвестная ошибка")
                 fail_code = status_data.get("failCode", "")
-                print(f"❌ Ошибка редактирования!")
+                print(f"❌ Ошибка генерации!")
                 print(f"Fail Code: {fail_code}")
                 print(f"Fail Message: {fail_msg}")
 
-                # Проверяем код 501 (Google модерация)
+                # Проверяем код ошибки 501 (Google модерация)
                 if str(fail_code) == "501":
                     print(f"🚫 Контент заблокирован модерацией Google (код 501)")
                     return "MODERATION_ERROR"
@@ -194,5 +191,5 @@ class ImageEditClient:
             
             await asyncio.sleep(delay)
         
-        print("❌ Превышено время ожидания редактирования")
+        print("❌ Превышено время ожидания генерации")
         return "TIMEOUT_ERROR"
