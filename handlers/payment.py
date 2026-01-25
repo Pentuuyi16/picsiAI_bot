@@ -12,7 +12,7 @@ from keyboards.inline import (
     get_video_format_keyboard,
     get_main_menu_keyboard,
     get_cabinet_keyboard,
-    get_motion_control_keyboard
+    get_video_menu_keyboard
 )
 import aiohttp
 from PIL import Image
@@ -318,37 +318,18 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "back_to_motion_control")
 async def back_to_motion_control_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Назад' - возврат в управление движением"""
-    from database.database import Database
-    
-    user_id = callback.from_user.id
-    
-    db = Database()
-    user = db.get_user(user_id)
-    balance = user['balance'] if user else 0.00
-    
-    text = (
-        "<b>✨ Наш бот умеет управлять движением</b>\n\n"
-        "<b>Готовы создать видео, которое удивляет?</b>\n\n"
-        "1️⃣ <b><i>Выберите качество</i></b> — 720p или 1080p.\n"
-        "2️⃣ <b><i>Загрузите фото</i></b> в бот — быстро и просто.\n"
-        "3️⃣ <b><i>Отправьте видео-пример</i></b> для управления движением.\n"
-        "4️⃣ <b><i>Подождите</i></b> 5–10 минут — и получите своё уникальное видео!\n\n"
-        "<b><i>Создавайте контент</i></b>, который цепляет и выделяет вас 💫\n\n"
-        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"📹 Генерация видео 720p 1 секунда = 5₽\n"
-        f"📹 Генерация видео 1080p 1 секунда = 7₽</blockquote>"
-    )
-    
+    """Обработчик кнопки 'Назад' - возврат в видео-контент"""
+    from utils.texts import TEXTS
+
     try:
         await callback.message.delete()
     except:
         pass
-    
+
     await callback.message.answer(
-        text,
+        TEXTS['welcome_message'],
         parse_mode="HTML",
-        reply_markup=get_motion_control_keyboard()
+        reply_markup=get_video_menu_keyboard()
     )
     await callback.answer()
 

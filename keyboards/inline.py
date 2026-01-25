@@ -44,7 +44,7 @@ def get_video_menu_keyboard() -> InlineKeyboardMarkup:
     """Создаёт подменю 'Видео-контент'"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🕺 Управление движением", callback_data="motion_control")],
+            [InlineKeyboardButton(text="🕺 ИИ модель", callback_data="motion_control")],
             [
                 InlineKeyboardButton(text="📸 Оживить фото", callback_data="photo_animation"),
                 InlineKeyboardButton(text="🎥 Создать видео", callback_data="video_generation")
@@ -211,19 +211,6 @@ def get_cabinet_keyboard() -> InlineKeyboardMarkup:
         ]
     )
     return keyboard
-
-def get_motion_control_keyboard():
-    """Создаёт клавиатуру для раздела управления движением"""
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🕺 Управлять движением", callback_data="control_motion")],
-            [InlineKeyboardButton(text="Видео-инструкция", callback_data="video_instruction_motion")],
-            [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up_balance_motion")],
-            [InlineKeyboardButton(text="← Назад", callback_data="video_menu")]
-        ]
-    )
-    return keyboard
-
 
 def get_motion_quality_keyboard():
     """Создаёт клавиатуру для выбора качества управления движением"""
