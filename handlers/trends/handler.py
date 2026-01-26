@@ -18,10 +18,7 @@ async def trends_handler(callback: CallbackQuery):
     except:
         pass
     
-    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
-    if generations == 1:
-        generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
-    generation_text += "</blockquote>"
+    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>"
     
     await callback.message.answer(
         f"Выберите тренд, который лучше всего вам подходит 💫\n\n"

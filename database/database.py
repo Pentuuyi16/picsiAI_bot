@@ -350,12 +350,12 @@ class Database:
         ''', (user_id,))
         return self.cursor.fetchall()
     
-    def add_user(self, user_id: int, username: str = None, first_name: str = None, 
+    def add_user(self, user_id: int, username: str = None, first_name: str = None,
                  last_name: str = None):
         """Добавляет нового пользователя в базу данных"""
         self.cursor.execute('''
             INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, balance, generations)
-            VALUES (?, ?, ?, ?, 0.0, 1)
+            VALUES (?, ?, ?, ?, 0.0, 0)
         ''', (user_id, username, first_name, last_name))
         self.conn.commit()
     

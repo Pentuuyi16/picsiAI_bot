@@ -99,10 +99,7 @@ async def create_photo_handler(callback: CallbackQuery, state: FSMContext):
     db = Database()
     generations = db.get_user_generations(user_id)
 
-    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
-    if generations == 1 and not db.has_purchased_generations(user_id):
-        generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
-    generation_text += "</blockquote>"
+    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>"
 
     text = (
         "📐 Выберите соотношение сторон для генерации:\n\n"
