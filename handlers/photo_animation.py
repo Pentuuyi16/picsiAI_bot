@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery, Message, URLInputFile, FSInputFile
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from keyboards.inline import get_photo_animation_keyboard, get_video_menu_keyboard
+from keyboards.inline import get_video_menu_keyboard
 from utils.api_client import KieApiClient
 from utils.texts import TEXTS
 import os
@@ -22,68 +22,24 @@ class PhotoAnimationStates(StatesGroup):
 
 
 @router.callback_query(F.data == "photo_animation")
-async def photo_animation_handler(callback: CallbackQuery):
+async def photo_animation_handler(callback: CallbackQuery, state: FSMContext):
     """Обработчик кнопки 'Оживление фото'"""
-    from database.database import Database
-    
-    db = Database()
-    user = db.get_user(callback.from_user.id)
-    balance = user['balance'] if user else 0.00
-    
-    text = (
-        "✨ <b>Наш Бот превращает старые фото в живые истории!</b>\n\n"
-        "<b>Как оживить фото?</b>\n\n"
-        "1️⃣ <b><i>Загрузите фото в бот</i></b> — любое, от старых снимков до современных портретов.\n"
-        "2️⃣ <b><i>Опишите</i></b>, что хотите видеть в анимации — движение, эмоцию, действие.\n"
-        "3️⃣ <b><i>Подождите пару минут</i></b> — и получите своё уникальное видео, созданное специально для вас!\n\n"
-        "Ваши воспоминания <b><i>заслуживают</i></b> нового дыхания 💫\n\n"
-        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"📹 Оживление 1 фото = 40₽</blockquote>"
-    )
-    
-    # Удаляем старое сообщение
-    await callback.message.delete()
-    
-    # Отправляем новое с видео
-    await callback.message.answer_video(
-        video=EXAMPLE_VIDEO_FILE_ID,
-        caption=text,
-        parse_mode="HTML",
-        reply_markup=get_photo_animation_keyboard()
-    )
-    
-    await callback.answer()
-
-
-@router.callback_query(F.data == "animate_photo")
-async def animate_photo_handler(callback: CallbackQuery, state: FSMContext):
-    """Обработчик кнопки 'Оживить фото'"""
-    # Путь к примеру фото (положите файл пример.jpg в корень проекта)
+    # Путь к примеру фото
     example_photo_path = "example_photo.jpg"
-    
-    # Кнопка "Назад"
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Назад", callback_data="photo_animation")]
-        ]
-    )
-    
+
     # Проверяем существует ли файл
     if os.path.exists(example_photo_path):
         photo = FSInputFile(example_photo_path)
         await callback.message.answer_photo(
             photo=photo,
             caption="<b>Пример ⤴️</b>\n\nПришлите <b><i>фотографию</i></b>, которую хотите оживить ✨🎬",
-            parse_mode="HTML",
-            reply_markup=keyboard
+            parse_mode="HTML"
         )
     else:
         # Если файла нет, отправляем просто текст
         await callback.message.answer(
-            "<b>Пример ⤴️</b>\n\n"
             "Пришлите <b><i>фотографию</i></b>, которую хотите оживить ✨🎬",
-            parse_mode="HTML",
-            reply_markup=keyboard
+            parse_mode="HTML"
         )
     
     await state.set_state(PhotoAnimationStates.waiting_for_photo)

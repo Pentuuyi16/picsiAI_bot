@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery, Message, URLInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from keyboards.inline import get_video_generation_keyboard, get_video_format_keyboard, get_aspect_ratio_keyboard, get_video_menu_keyboard
+from keyboards.inline import get_video_format_keyboard, get_aspect_ratio_keyboard, get_video_menu_keyboard
 from utils.veo_api_client import VeoApiClient
 from utils.texts import TEXTS
 import logging
@@ -28,47 +28,6 @@ class VideoGenerationStates(StatesGroup):
 @router.callback_query(F.data == "video_generation")
 async def video_generation_handler(callback: CallbackQuery):
     """Обработчик кнопки 'Создание видео'"""
-    from database.database import Database
-    
-    user_id = callback.from_user.id
-    
-    # Получаем баланс из БД
-    db = Database()
-    user = db.get_user(user_id)
-    balance = user['balance'] if user else 0.00
-    
-    text = (
-        "<b>✨ Наш Бот превращает ваши идеи и фотографии в яркие видеосюжеты!</b>\n\n"
-        "<b>Как создать своё видео?</b>\n\n"
-        "1️⃣ <b><i>Отправьте текст</i></b> с идеей или загрузите фотографию\n"
-        "2️⃣ <b><i>Опишите</i></b> настроение, сюжет или пару ключевых слов\n"
-        "3️⃣ <b><i>Подождите несколько минут</i></b> — бот создаст стильный видеоролик\n\n"
-        "<b>🔥 Доступны два способа создания видео:</b>\n\n"
-        "• <b><i>По тексту</i></b> — напишите свою задумку, и бот соберёт по ней уникальный видеосюжет.\n"
-        "• <b><i>По фото</i></b> — загрузите изображение, и бот создаст видео, вдохновлённое вашим кадром.\n\n"
-        "Любую <b><i>мысль</i></b> можно превратить в историю 💫\n\n"
-        f"<blockquote>💰 Ваш баланс: {balance:.2f} ₽\n"
-        f"📹 Генерация 1 видео = 65₽\n"
-        f"📹 Генерация 1 видео (высокое качество) = 115₽</blockquote>"
-    )
-    
-    # Удаляем старое сообщение
-    await callback.message.delete()
-    
-    # Отправляем новое с видео
-    await callback.message.answer_video(
-        video=EXAMPLE_VIDEO_FILE_ID,
-        caption=text,
-        parse_mode="HTML",
-        reply_markup=get_video_generation_keyboard()
-    )
-    
-    await callback.answer()
-
-
-@router.callback_query(F.data == "generate_video")
-async def generate_video_handler(callback: CallbackQuery):
-    """Обработчик кнопки 'Сгенерировать видео'"""
     await callback.message.answer(
         "🚀 <b><i>Выберите</i></b> удобный формат генерации",
         parse_mode="HTML",
