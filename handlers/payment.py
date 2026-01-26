@@ -281,7 +281,11 @@ async def back_to_image_editing_handler(callback: CallbackQuery):
     db = Database()
     generations = db.get_user_generations(user_id)
 
-    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>"
+    generation_text = (
+        f"<blockquote>⚡ У вас осталось: {generations} генераций\n\n"
+        f"🌟 Nano Banana — 1 генерация\n"
+        f"🚀 Nano Banana Pro — 4 генерации</blockquote>"
+    )
 
     text = (
         "<b>🖼️ Работа с изображениями</b>\n\n"

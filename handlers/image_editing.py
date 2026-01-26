@@ -111,7 +111,11 @@ async def image_editing_handler(callback: CallbackQuery, state: FSMContext):
     db = Database()
     generations = db.get_user_generations(user_id)
 
-    generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>"
+    generation_text = (
+        f"<blockquote>⚡ У вас осталось: {generations} генераций\n\n"
+        f"🌟 Nano Banana — 1 генерация\n"
+        f"🚀 Nano Banana Pro — 4 генерации</blockquote>"
+    )
 
     text = (
         "📐 Выберите соотношение сторон для редактирования:\n\n"
@@ -181,7 +185,8 @@ async def edit_aspect_handler(callback: CallbackQuery, state: FSMContext):
         "• Качество: <b><i>максимальный уровень детализации</i></b>\n"
         "• Промты до <b><i>5000 символов</i></b>\n"
         "• <b><i>Продвинутое понимание текста</i></b> для точных результатов\n\n"
-        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>",
+        f"<blockquote>⚡ У вас осталось: {generations} генераций</blockquote>\n\n"
+        "<b>Для лучшего результата старайтесь использовать профессиональную модель</b>",
         parse_mode="HTML",
         reply_markup=get_trend_model_selection_keyboard(generations)
     )
