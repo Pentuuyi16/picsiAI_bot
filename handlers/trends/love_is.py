@@ -7,17 +7,26 @@ router = Router()
 
 PHOTO_FILE_ID = "AgACAgIAAxkBAAIejWmAk8U5K8sgERedM7zFQfQeFXh8AALpD2sbe8ABSEV_dksKjR19AQADAgADdwADOAQ"
 
-LOVE_IS_PROMPT = (
-    "Create a romantic 'Love is...' style illustration featuring the people from the photo. "
-    "Transform them into a cute, simple cartoon couple in the classic 'Love is' comic strip style. "
-    "Keep their distinctive features recognizable but in a sweet, minimalist art style. "
-    "Add a romantic scene or gesture between them. Use soft pastel colors and simple lines. "
-    "The style should be innocent, heartwarming, and match the iconic 'Love is' aesthetic."
+LOVE_IS_PROMPT_TEMPLATE = (
+    "Recreate the uploaded reference image composition exactly in classic 'Love Is…' comic style. "
+    "Use the uploaded couple photo as face reference and replace the original characters with the two people from the photo while preserving their facial likeness. "
+    "Match the same poses, body positions, proportions and interaction as in the reference image. "
+    "Keep the same cartoon proportions: big heads, small bodies, rounded shapes, simple facial features, blush on cheeks. "
+    "Outfit colors and positions should follow the reference layout. "
+    "Background: white canvas with light blue circular backdrop behind characters. "
+    "Add small red hearts floating above heads exactly like reference. "
+    "Draw thick clean black outlines, flat pastel coloring, smooth shading. "
+    "Title text at top: 'Love is…' in handwritten comic font style. "
+    "Bottom caption placement identical to reference with romantic sentence. "
+    "Poster vertical format, centered characters, vintage Love Is postcard look. "
+    "High resolution illustration, no realism, no 3D, pure 2D cartoon style. "
+    "Bottom caption text in Russian: '{user_text}'"
 )
 
 
 class LoveIsStates(StatesGroup):
     waiting_for_photo = State()
+    waiting_for_text = State()
     waiting_for_aspect = State()
     waiting_for_model = State()
 
@@ -60,6 +69,30 @@ async def process_love_is_photo(message: Message, state: FSMContext, bot):
     print(f"🎨 User {user_id} - Love is trend photo: {photo_url}")
 
     await state.update_data(photo_url=photo_url)
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Отмена", callback_data="trends")]
+        ]
+    )
+
+    await message.answer(
+        "💬 Отлично! Теперь <b><i>напишите текст</i></b>, который хотите видеть на фотографии\n\n"
+        "Например: <i>…когда ты рядом</i>",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
+
+    await state.set_state(LoveIsStates.waiting_for_text)
+
+
+@router.message(LoveIsStates.waiting_for_text, F.text)
+async def process_love_is_text(message: Message, state: FSMContext):
+    user_text = message.text.strip()
+
+    print(f"🎨 User {message.from_user.id} - Love is text: {user_text}")
+
+    await state.update_data(user_text=user_text)
 
     from keyboards.inline import get_trend_aspect_ratio_keyboard
 
@@ -134,12 +167,13 @@ async def process_love_is_model(callback: CallbackQuery, state: FSMContext, bot)
 
     data = await state.get_data()
     photo_url = data.get("photo_url")
+    user_text = data.get("user_text")
     aspect_ratio = data.get("aspect_ratio")
 
-    if not photo_url or not aspect_ratio:
+    if not photo_url or not user_text or not aspect_ratio:
         await bot.send_message(
             chat_id=callback.message.chat.id,
-            text="❌ Ошибка: фото не найдено. Попробуйте заново."
+            text="❌ Ошибка: данные не найдены. Попробуйте заново."
         )
         await state.clear()
         return
@@ -171,6 +205,9 @@ async def process_love_is_model(callback: CallbackQuery, state: FSMContext, bot)
 
     print(f"🎨 User {user_id} - Selected model: {model_type}, aspect ratio: {aspect_ratio}")
 
+    final_prompt = LOVE_IS_PROMPT_TEMPLATE.format(user_text=user_text)
+    print(f"📝 Final prompt: {final_prompt}")
+
     processing_msg = await bot.send_message(
         chat_id=callback.message.chat.id,
         text="⭐ Начинается редактирование, пожалуйста подождите..."
@@ -182,7 +219,7 @@ async def process_love_is_model(callback: CallbackQuery, state: FSMContext, bot)
             edit_client = NanoBananaEditClient()
 
             task_id = await edit_client.create_edit_task(
-                prompt=LOVE_IS_PROMPT,
+                prompt=final_prompt,
                 image_urls=[photo_url],
                 image_size=aspect_ratio,
                 output_format="png"
@@ -192,7 +229,7 @@ async def process_love_is_model(callback: CallbackQuery, state: FSMContext, bot)
             edit_client = ImageEditClient()
 
             task_id = await edit_client.create_edit_task(
-                prompt=LOVE_IS_PROMPT,
+                prompt=final_prompt,
                 image_urls=[photo_url],
                 aspect_ratio=aspect_ratio,
                 resolution="2K",
@@ -293,7 +330,7 @@ async def process_love_is_model(callback: CallbackQuery, state: FSMContext, bot)
 
                     print(f"✅ Photo sent successfully!")
 
-                    db.save_generation(user_id, "trend_love_is", result_url, LOVE_IS_PROMPT)
+                    db.save_generation(user_id, "trend_love_is", result_url, final_prompt)
 
                     from keyboards.inline import get_trends_keyboard
                     generations = db.get_user_generations(user_id)
