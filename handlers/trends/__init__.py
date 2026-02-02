@@ -14,6 +14,7 @@ from .heart_building import router as heart_building_router
 from .car import router as car_router
 from .scream import router as scream_router
 from .avatar import router as avatar_router
+from .love_is import router as love_is_router
 
 # Главный роутер для трендов
 router = Router()
@@ -31,6 +32,7 @@ router.include_router(heart_building_router)
 router.include_router(car_router)
 router.include_router(scream_router)
 router.include_router(avatar_router)
+router.include_router(love_is_router)
 
 
 @router.callback_query(F.data == "trends")
@@ -75,7 +77,10 @@ async def trends_page_2_handler(callback: CallbackQuery):
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="Я аватар", callback_data="trend_avatar")],
+                [
+                    InlineKeyboardButton(text="Я аватар", callback_data="trend_avatar"),
+                    InlineKeyboardButton(text="Именной букет", callback_data="trend_bouquet")
+                ],
                 [InlineKeyboardButton(text="← Предыдущая страница", callback_data="trends")],
                 [InlineKeyboardButton(text="← Главное меню", callback_data="main_menu")]
             ]

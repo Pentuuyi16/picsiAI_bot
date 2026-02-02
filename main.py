@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.types import BotCommand, Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
@@ -15,6 +15,23 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ========== ВРЕМЕННЫЙ ОБРАБОТЧИК ДЛЯ ПОЛУЧЕНИЯ FILE_ID ==========
+temp_router = Router()
+
+@temp_router.message(F.photo)
+async def temp_get_file_id(message: Message):
+    """Временный обработчик для получения file_id фотографии"""
+    photo = message.photo[-1]  # Берём фото в максимальном качестве
+    await message.answer(
+        f"📸 File ID фотографии:\n\n<code>{photo.file_id}</code>\n\n"
+        f"Размер: {photo.width}x{photo.height}\n"
+        f"Размер файла: {photo.file_size} байт",
+        parse_mode="HTML"
+    )
+    logger.info(f"File ID: {photo.file_id}")
+# ==================================================================
 
 
 async def main():
@@ -33,6 +50,9 @@ async def main():
     ]
     await bot.set_my_commands(commands)
     logger.info("✅ Команды бота настроены")
+    
+    # РЕГИСТРИРУЕМ ВРЕМЕННЫЙ ОБРАБОТЧИК (ПЕРВЫМ!)
+    dp.include_router(temp_router)
     
     # Подключаем роутеры из handlers
     dp.include_router(start.router)
@@ -66,4 +86,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("⛔ Бот остановлен")
-

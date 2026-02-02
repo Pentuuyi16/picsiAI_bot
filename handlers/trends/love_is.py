@@ -5,37 +5,36 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIOHmluok2kQF0pfQc311ebHBcetuKwAAIvFWsbSD9wS0ot3b5oVW2eAQADAgADeQADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIGX2mAk0iN7YUOuwPyAx11eDTspEMeAALpD2sbe8ABSFnEPALXrTfjAQADAgADdwADOAQ"
 
-BOUQUET_PROMPT_TEMPLATE = (
-    "A girl sits in an apartment at night, surrounded by large, expensive bouquets of white and red roses. "
-    "Each bouquet clearly displays a perfectly formed letter: {name_letters}... "
-    "View from above She sits among them. She looks into the camera. "
-    "She is wearing a stylish, form-fitting black dress. "
-    "Photo taken with a flash on a film camera. Her hair is shiny."
+LOVE_IS_PROMPT = (
+    "Create a romantic 'Love is...' style illustration featuring the people from the photo. "
+    "Transform them into a cute, simple cartoon couple in the classic 'Love is' comic strip style. "
+    "Keep their distinctive features recognizable but in a sweet, minimalist art style. "
+    "Add a romantic scene or gesture between them. Use soft pastel colors and simple lines. "
+    "The style should be innocent, heartwarming, and match the iconic 'Love is' aesthetic."
 )
 
 
-class BouquetStates(StatesGroup):
+class LoveIsStates(StatesGroup):
     waiting_for_photo = State()
-    waiting_for_name = State()
     waiting_for_aspect = State()
     waiting_for_model = State()
 
 
-@router.callback_query(F.data == "trend_bouquet")
-async def trend_bouquet_handler(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == "trend_love_is")
+async def trend_love_is_handler(callback: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Назад", callback_data="trends_page_2")]
+            [InlineKeyboardButton(text="Назад", callback_data="trends")]
         ]
     )
-    
+
     try:
         await callback.message.delete()
     except:
         pass
-    
+
     await callback.message.answer_photo(
         photo=PHOTO_FILE_ID,
         caption=(
@@ -45,77 +44,53 @@ async def trend_bouquet_handler(callback: CallbackQuery, state: FSMContext):
         parse_mode="HTML",
         reply_markup=keyboard
     )
-    
-    await state.set_state(BouquetStates.waiting_for_photo)
+
+    await state.set_state(LoveIsStates.waiting_for_photo)
     await callback.answer()
 
 
-@router.message(BouquetStates.waiting_for_photo, F.photo)
-async def process_bouquet_photo(message: Message, state: FSMContext, bot):
+@router.message(LoveIsStates.waiting_for_photo, F.photo)
+async def process_love_is_photo(message: Message, state: FSMContext, bot):
     user_id = message.from_user.id
-    
+
     photo = message.photo[-1]
     file = await bot.get_file(photo.file_id)
     photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
-    
-    print(f"🎨 User {user_id} - Bouquet trend photo: {photo_url}")
-    
+
+    print(f"🎨 User {user_id} - Love is trend photo: {photo_url}")
+
     await state.update_data(photo_url=photo_url)
-    
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Отмена", callback_data="trends")]
-        ]
-    )
-    
-    await message.answer(
-        "👍 Отлично! Теперь <b><i>напишите имя</i></b>, которое хотите видеть на букетах\n\n"
-        "Имя должно быть обязательно написано на английском языке",
-        parse_mode="HTML",
-        reply_markup=keyboard
-    )
-    
-    await state.set_state(BouquetStates.waiting_for_name)
 
-
-@router.message(BouquetStates.waiting_for_name, F.text)
-async def process_bouquet_name(message: Message, state: FSMContext):
-    user_name = message.text.strip()
-    
-    print(f"🎨 User {message.from_user.id} - Name: {user_name}")
-    
-    await state.update_data(user_name=user_name)
-    
     from keyboards.inline import get_trend_aspect_ratio_keyboard
-    
+
     await message.answer(
         "📐 Выберите <b>соотношение сторон</b> для вашего фото:",
         parse_mode="HTML",
         reply_markup=get_trend_aspect_ratio_keyboard()
     )
-    
-    await state.set_state(BouquetStates.waiting_for_aspect)
+
+    await state.set_state(LoveIsStates.waiting_for_aspect)
 
 
-@router.callback_query(BouquetStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
-async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(LoveIsStates.waiting_for_aspect, F.data.in_(["trend_aspect_16_9", "trend_aspect_9_16", "trend_aspect_1_1"]))
+async def process_love_is_aspect(callback: CallbackQuery, state: FSMContext):
     from database.database import Database
-    
+
     aspect_map = {
         "trend_aspect_16_9": "16:9",
         "trend_aspect_9_16": "9:16",
         "trend_aspect_1_1": "1:1"
     }
-    
+
     aspect_ratio = aspect_map[callback.data]
     await state.update_data(aspect_ratio=aspect_ratio)
-    
+
     user_id = callback.from_user.id
     db = Database()
     generations = db.get_user_generations(user_id)
-    
+
     from keyboards.inline import get_trend_model_selection_keyboard
-    
+
     await callback.message.answer(
         "<b>🤖 Выбор модели генерации</b>\n\n"
         "<b>Активная модель: Стандартная</b>\n\n"
@@ -133,23 +108,22 @@ async def process_bouquet_aspect(callback: CallbackQuery, state: FSMContext):
         parse_mode="HTML",
         reply_markup=get_trend_model_selection_keyboard(generations)
     )
-    
-    await state.set_state(BouquetStates.waiting_for_model)
+
+    await state.set_state(LoveIsStates.waiting_for_model)
     await callback.answer()
 
 
-@router.callback_query(BouquetStates.waiting_for_model, F.data.in_(["trend_model_standard", "trend_model_pro"]))
-async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot):
-    # СРАЗУ отвечаем на callback!
+@router.callback_query(LoveIsStates.waiting_for_model, F.data.in_(["trend_model_standard", "trend_model_pro"]))
+async def process_love_is_model(callback: CallbackQuery, state: FSMContext, bot):
     await callback.answer()
-    
     from database.database import Database
     import aiohttp
     from PIL import Image
     from io import BytesIO
     from aiogram.types import URLInputFile, BufferedInputFile
-    
-    # Удаляем сообщение с выбором модели
+
+
+
     try:
         await callback.message.delete()
     except:
@@ -160,14 +134,13 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
 
     data = await state.get_data()
     photo_url = data.get("photo_url")
-    user_name = data.get("user_name")  # ВАЖНО: получаем имя!
     aspect_ratio = data.get("aspect_ratio")
 
-    if not photo_url or not user_name or not aspect_ratio:
+    if not photo_url or not aspect_ratio:
         await bot.send_message(
             chat_id=callback.message.chat.id,
-            text="❌ Ошибка: данные не найдены. Попробуйте заново."
-        )   
+            text="❌ Ошибка: фото не найдено. Попробуйте заново."
+        )
         await state.clear()
         return
 
@@ -183,7 +156,7 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                 [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
             ]
         )
-    
+
         await bot.send_message(
             chat_id=callback.message.chat.id,
             text="У вас закончились генерации 😔\n\n"
@@ -198,25 +171,18 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
 
     print(f"🎨 User {user_id} - Selected model: {model_type}, aspect ratio: {aspect_ratio}")
 
-    # СОЗДАЕМ ФИНАЛЬНЫЙ ПРОМПТ С ИМЕНЕМ!
-    name_upper = user_name.upper()
-    name_letters = ", ".join([f'"{letter}"' for letter in name_upper])
-    final_prompt = BOUQUET_PROMPT_TEMPLATE.format(name_letters=name_letters)
-    
-    print(f"📝 Final prompt: {final_prompt}")
-
     processing_msg = await bot.send_message(
         chat_id=callback.message.chat.id,
         text="⭐ Начинается редактирование, пожалуйста подождите..."
     )
-    
+
     try:
         if model_type == "standard":
             from utils.nano_banana_edit_client import NanoBananaEditClient
             edit_client = NanoBananaEditClient()
-            
+
             task_id = await edit_client.create_edit_task(
-                prompt=final_prompt,
+                prompt=LOVE_IS_PROMPT,
                 image_urls=[photo_url],
                 image_size=aspect_ratio,
                 output_format="png"
@@ -224,28 +190,26 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
         else:
             from utils.image_edit_client import ImageEditClient
             edit_client = ImageEditClient()
-            
+
             task_id = await edit_client.create_edit_task(
-                prompt=final_prompt,
+                prompt=LOVE_IS_PROMPT,
                 image_urls=[photo_url],
                 aspect_ratio=aspect_ratio,
                 resolution="2K",
                 output_format="png"
             )
-        
+
         if not task_id:
             await processing_msg.edit_text(
                 "❌ Произошла ошибка при создании задачи. Попробуйте позже."
             )
             await state.clear()
             return
-        
+
         print(f"✅ Task created: {task_id}")
-        
+
         if model_type == "pro":
-            # Для Pro модели: увеличенный таймаут и показ прогресса
             async def update_progress(elapsed_min, remaining_min):
-                """Обновляет сообщение с прогрессом для пользователя"""
                 try:
                     await processing_msg.edit_text(
                         f"⭐ Идет генерация в высоком качестве...\n\n"
@@ -254,19 +218,18 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                         f"💡 Профессиональная модель создает изображения в 4K, "
                         f"это требует больше времени, но результат того стоит!"
                     )
-                except Exception as e:
-                    print(f"⚠️ Ошибка обновления прогресса: {e}")
-            
+                except:
+                    pass
+
             result_url = await edit_client.wait_for_result(
-                task_id, 
-                max_attempts=240,  # 20 минут для Pro
+                task_id,
+                max_attempts=240,
                 delay=5,
                 progress_callback=update_progress
             )
         else:
-            # Для Standard модели: обычный таймаут без прогресса
             result_url = await edit_client.wait_for_result(task_id, max_attempts=120, delay=5)
-        
+
         if result_url:
             if result_url == "MODERATION_ERROR":
                 await processing_msg.edit_text(
@@ -278,45 +241,31 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                     "💡 Совет: используйте обычные фотографии\n\n"
                     "💛 Не переживайте, генерация не списана"
                 )
-            elif result_url == "TIMEOUT_ERROR":
-                await processing_msg.edit_text(
-                    "⏱️ Время ожидания истекло\n\n"
-                    "Сервер генерации не успел обработать запрос.\n\n"
-                    "Возможные причины:\n"
-                    "• Очень высокая нагрузка на сервер\n"
-                    "• Слишком сложное изображение\n\n"
-                    "💡 Попробуйте:\n"
-                    "• Подождать 5-10 минут и попробовать снова\n"
-                    "• Использовать стандартную модель (она быстрее)\n\n"
-                    "💛 Не переживайте, генерация не списана"
-                )
             else:
-                # ========== СПИСАНИЕ ГЕНЕРАЦИИ ==========
                 db.subtract_generations(user_id, generations_cost)
-                # ========================================
-                
+
                 print(f"✅ Generation successful! Result URL: {result_url}")
-                
+
                 try:
                     print(f"📤 Отправка изображения: {result_url}")
-                    
+
                     async with aiohttp.ClientSession() as session:
                         async with session.get(result_url) as response:
                             image_data = await response.read()
                             original_size_mb = len(image_data) / (1024 * 1024)
                             print(f"   Размер: {original_size_mb:.2f} MB")
-                    
+
                     if original_size_mb > 9.0:
                         print(f"   🔧 Сжимаем изображение...")
                         img = Image.open(BytesIO(image_data))
-                        
+
                         if img.mode in ('RGBA', 'P', 'LA'):
                             background = Image.new('RGB', img.size, (255, 255, 255))
                             if img.mode == 'P':
                                 img = img.convert('RGBA')
                             background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
                             img = background
-                        
+
                         output = BytesIO()
                         quality = 85
                         while quality > 20:
@@ -327,13 +276,13 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                             if size_mb <= 9.0:
                                 break
                             quality -= 5
-                        
+
                         output.seek(0)
                         photo_file = BufferedInputFile(output.read(), filename="image.jpg")
                         print(f"   ✅ Сжато до {size_mb:.2f} MB")
                     else:
                         photo_file = URLInputFile(result_url)
-                    
+
                     await bot.send_photo(
                         chat_id=callback.message.chat.id,
                         photo=photo_file,
@@ -341,26 +290,26 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                         request_timeout=180
                     )
                     await processing_msg.delete()
-                    
+
                     print(f"✅ Photo sent successfully!")
-                    
-                    db.save_generation(user_id, "trend_bouquet", result_url, final_prompt)
-                    
+
+                    db.save_generation(user_id, "trend_love_is", result_url, LOVE_IS_PROMPT)
+
                     from keyboards.inline import get_trends_keyboard
                     generations = db.get_user_generations(user_id)
-                    
+
                     generation_text = f"<blockquote>⚡ У вас осталось: {generations} генераций"
                     if generations == 1 and not db.has_purchased_generations(user_id):
                         generation_text += "\n🎨 Вам доступна 1 бесплатная генерация"
                     generation_text += "</blockquote>"
-                    
+
                     await bot.send_message(
                         chat_id=callback.message.chat.id,
                         text=f"Выберите тренд, который лучше всего вам подходит 💫\n\n{generation_text}",
                         parse_mode="HTML",
                         reply_markup=get_trends_keyboard(page=1)
                     )
-                    
+
                 except Exception as e:
                     print(f"❌ Error sending photo: {e}")
                     await processing_msg.edit_text(
@@ -375,14 +324,14 @@ async def process_bouquet_model(callback: CallbackQuery, state: FSMContext, bot)
                 "💡 Попробуйте ещё раз через пару минут\n\n"
                 "💛 Не переживайте, генерация не списана"
             )
-    
+
     except Exception as e:
         print(f"❌ Generation error: {e}")
         import traceback
         traceback.print_exc()
-        
+
         await processing_msg.edit_text(
             "❌ Произошла ошибка при редактировании. Попробуйте позже."
         )
-    
+
     await state.clear()

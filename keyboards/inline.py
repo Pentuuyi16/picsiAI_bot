@@ -231,7 +231,7 @@ def get_trends_keyboard(page: int = 1) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="Фотки с макбука", callback_data="trend_macbook"),
-                InlineKeyboardButton(text="Именной букет", callback_data="trend_bouquet")
+                InlineKeyboardButton(text="Love is", callback_data="trend_love_is")
             ],
             [
                 InlineKeyboardButton(text="Снежный ангел", callback_data="trend_snow_angel"),
