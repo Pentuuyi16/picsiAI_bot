@@ -130,22 +130,30 @@ class Database:
     
     def subtract_generations(self, user_id: int, amount: int = 1):
         """Списывает генерации у пользователя"""
+        # Для админа не списываем генерации
+        if user_id == 6397535545:
+            print(f"⚡ Списание генераций пропущено для админа: User {user_id}")
+            return True
+
         user = self.get_user(user_id)
         if user:
             current_generations = user.get('generations', 0)
             new_generations = max(0, current_generations - amount)
             print(f"⚡ Списание генераций: User {user_id}, Old: {current_generations}, Subtract: {amount}, New: {new_generations}")
-            
+
             self.cursor.execute('''
                 UPDATE users SET generations = ? WHERE user_id = ?
             ''', (new_generations, user_id))
             self.conn.commit()
-            
+
             return True
         return False
     
     def get_user_generations(self, user_id: int):
         """Получает количество генераций пользователя"""
+        # Для админа всегда 1000 генераций
+        if user_id == 6397535545:
+            return 1000
         user = self.get_user(user_id)
         return user.get('generations', 0) if user else 0
     
