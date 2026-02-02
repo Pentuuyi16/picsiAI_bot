@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 router = Router()
 
-PHOTO_FILE_ID = "AgACAgIAAxkBAAIGX2mAk0iN7YUOuwPyAx11eDTspEMeAALpD2sbe8ABSFnEPALXrTfjAQADAgADdwADOAQ"
+PHOTO_FILE_ID = "AgACAgIAAxkBAAIejWmAk8U5K8sgERedM7zFQfQeFXh8AALpD2sbe8ABSEV_dksKjR19AQADAgADdwADOAQ"
 
 LOVE_IS_PROMPT = (
     "Create a romantic 'Love is...' style illustration featuring the people from the photo. "
